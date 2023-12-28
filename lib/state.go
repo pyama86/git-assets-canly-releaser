@@ -116,14 +116,6 @@ func (s *State) getReleases(key string) ([]string, error) {
 	return s.client.SMembers(context.Background(), key).Result()
 }
 
-func (s *State) getStableReleaseTag() (string, error) {
-	return s.getRelease(s.stableReleaseTagKey)
-}
-
-func (s *State) getAvoidReleaseTag() ([]string, error) {
-	return s.getReleases(s.avoidReleaseTagKey)
-}
-
 type LocalState struct {
 	LastInstalledTag string `json:"last_installed_tag"`
 	stateFilePath    string

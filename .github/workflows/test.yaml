@@ -1,0 +1,36 @@
+
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Go
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    container: golang:latest
+    services:
+      redis:
+        image: redis
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build
+      run: |
+        git config --global --add safe.directory /__w/git-assets-canaly-releaser/git-assets-canaly-releaser
+        go build -v ./...
+
+    - name: Test
+      run: make ci
+      env:
+        REDIS_HOST: redis

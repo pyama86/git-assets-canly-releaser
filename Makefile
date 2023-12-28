@@ -14,3 +14,14 @@ run:
 		--canary-rollout-window 10s \
 		--repository-polling-interval 10s \
 		--save-assets-path ./tmp
+
+ci: lint test
+
+
+lint: devdeps
+	@staticcheck ./...
+	go vet ./...
+
+devdeps:
+	@which staticcheck > /dev/null || go install honnef.co/go/tools/cmd/staticcheck@latest
+

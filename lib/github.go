@@ -30,8 +30,8 @@ type GibHuber interface {
 
 func NewGitHub(config *Config) (*GitHub, error) {
 	token := config.GitHubToken
-	if token == "" {
-		token = os.Getenv("GITHUB_TOKEN")
+	if os.Getenv("GITHUB_TOKEN") == "" {
+		os.Setenv("GITHUB_TOKEN", token)
 	}
 
 	client, _ := factory.NewGithubClient()
@@ -48,7 +48,7 @@ func NewGitHub(config *Config) (*GitHub, error) {
 	}, nil
 }
 
-var AssetsNotFound = errors.New("no match assets")
+var ErrAssetsNotFound = errors.New("no match assets")
 
 const LatestTag = "latest"
 
@@ -112,5 +112,5 @@ func (g *GitHub) DownloadReleaseAsset(tag string) (string, string, error) {
 			return *release.TagName, filePath, nil
 		}
 	}
-	return "", "", AssetsNotFound
+	return "", "", ErrAssetsNotFound
 }

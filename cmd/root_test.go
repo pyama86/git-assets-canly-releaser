@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/pyama86/git-assets-canly-releaser/lib"
+	"github.com/pyama86/git-assets-canaly-releaser/lib"
 	redis "github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/mock"
 )

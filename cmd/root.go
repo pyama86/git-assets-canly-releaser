@@ -18,7 +18,7 @@ import (
 	"github.com/avast/retry-go"
 	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/go-homedir"
-	"github.com/pyama86/git-assets-canly-releaser/lib"
+	"github.com/pyama86/git-assets-canaly-releaser/lib"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -124,7 +124,7 @@ func handleCanaryRelease(config *lib.Config, github lib.GibHuber) error {
 
 	latestTag, downloadFile, err := github.DownloadReleaseAsset(lib.LatestTag)
 	if err != nil {
-		if errors.Is(err, lib.AssetsNotFound) {
+		if errors.Is(err, lib.ErrAssetsNotFound) {
 			slog.Info("latest release notfound")
 			if viper.GetBool("once") {
 				return nil
@@ -199,7 +199,7 @@ func handleRollback(config *lib.Config, github lib.GibHuber, rollbackTag string)
 	slog.Info("start rollback", "tag", rollbackTag)
 
 	_, downloadFile, err := github.DownloadReleaseAsset(rollbackTag)
-	if errors.Is(err, lib.AssetsNotFound) {
+	if errors.Is(err, lib.ErrAssetsNotFound) {
 		return fmt.Errorf("can't get release asset:%s", rollbackTag)
 	}
 

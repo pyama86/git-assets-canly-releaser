@@ -1,4 +1,4 @@
-module github.com/pyama86/git-assets-canly-releaser
+module github.com/pyama86/git-assets-canaly-releaser
 
 go 1.21.5
 
@@ -8,6 +8,7 @@ require (
 	github.com/google/go-github/v55 v55.0.0
 	github.com/k1LoW/go-github-client/v55 v55.0.11
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/pyama86/git-assets-canly-releaser v0.0.0-20231228164758-9271ca8b155c
 	github.com/redis/go-redis/v9 v9.3.1
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
