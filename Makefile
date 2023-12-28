@@ -9,8 +9,8 @@ run:
 		--rollback-command scripts/rollback \
 		--healthcheck-command scripts/healthcheck \
 		--package-name-pattern ".*" \
-		--once \
 		--log-level debug \
 		--health-check-interval 2s \
 		--canary-rollout-window 10s \
+		--repository-polling-interval 10s \
 		--save-assets-path ./tmp

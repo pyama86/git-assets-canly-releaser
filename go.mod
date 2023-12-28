@@ -3,14 +3,14 @@ module github.com/pyama86/git-assets-canly-releaser
 go 1.21.5
 
 require (
+	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/go-playground/validator/v10 v10.16.0
-	github.com/google/go-github v17.0.0+incompatible
+	github.com/google/go-github/v55 v55.0.0
 	github.com/k1LoW/go-github-client/v55 v55.0.11
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/redis/go-redis/v9 v9.3.1
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
-	github.com/thoas/go-funk v0.9.3
 )
 
 require (
@@ -26,7 +26,6 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
-	github.com/google/go-github/v55 v55.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

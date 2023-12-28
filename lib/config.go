@@ -25,4 +25,5 @@ type Config struct {
 	SlackWebhookURL          string        `mapstructure:"slack_webhook_url"`
 	Redis                    *RedisConfig  `mapstructure:"redis" validate:"required"`
 	LogLevel                 string        `mapstructure:"log_level"`
+	HealthCheckRetry         uint          `mapstructure:"healthcheck_retry" validate:"required"`
 }

@@ -3,6 +3,7 @@ package lib
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -19,8 +20,6 @@ type State struct {
 	rolloutKey          string
 	config              *Config
 }
-
-const stateFile = "/var/lib/gacr/state.json"
 
 func NewState(config *Config) (*State, error) {
 	rc := redis.NewClient(&redis.Options{
@@ -68,6 +67,23 @@ func (s *State) getLock(key string, tag string, window time.Duration) (bool, err
 	}
 	return false, nil
 }
+func (s *State) CurrentStableTag() (string, error) {
+	return s.getRelease(s.stableReleaseTagKey)
+}
+
+func (s *State) IsAvoidReleaseTag(tag string) (bool, error) {
+	tags, err := s.getReleases(s.avoidReleaseTagKey)
+	if err != nil {
+		return false, err
+	}
+	for _, t := range tags {
+		if t == tag {
+			return true, nil
+		}
+	}
+	return false, nil
+
+}
 
 func (s *State) saveRelease(key, tag string) error {
 	return s.client.Set(context.Background(), key, tag, 0).Err()
@@ -93,19 +109,54 @@ func (s *State) getReleases(key string) ([]string, error) {
 	return s.client.SMembers(context.Background(), key).Result()
 }
 
-func (s *State) GetStableReleaseTag() (string, error) {
+func (s *State) getStableReleaseTag() (string, error) {
 	return s.getRelease(s.stableReleaseTagKey)
 }
 
-func (s *State) GetAvoidReleaseTag() ([]string, error) {
+func (s *State) getAvoidReleaseTag() ([]string, error) {
 	return s.getReleases(s.avoidReleaseTagKey)
 }
 
+const StateFilePath = "/var/lib/gacr/state.json"
+
 type LocalState struct {
 	LastInstalledTag string `json:"last_installed_tag"`
+	stateFilePath    string
 }
 
-func (s *State) saveFile(path string, c interface{}) error {
+func NewLocalState(f string) (*LocalState, error) {
+	return &LocalState{
+		stateFilePath: f,
+	}, nil
+}
+
+func (s *LocalState) SaveLastInstalledTag(tag string) error {
+	s.LastInstalledTag = tag
+	return s.saveLocalState(s)
+}
+
+func (s *LocalState) CanInstallTag(tag string) (bool, error) {
+	lastInstalledTag, err := s.getLastInstalledTag()
+	if err != nil {
+		return false, err
+	}
+	if lastInstalledTag == "" {
+		return true, nil
+	}
+	if lastInstalledTag == tag {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (s *LocalState) getLastInstalledTag() (string, error) {
+	if err := s.readLocalState(); err != nil {
+		return "", err
+	}
+	return s.LastInstalledTag, nil
+}
+
+func (s *LocalState) saveFile(path string, c interface{}) error {
 	dir := path[:len(path)-len(path[strings.LastIndex(path, "/"):])]
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
@@ -120,33 +171,27 @@ func (s *State) saveFile(path string, c interface{}) error {
 	return json.NewEncoder(f).Encode(c)
 }
 
-func (s *State) SaveLocalState(state *LocalState) error {
-	return s.saveFile(stateFile, state)
+func (s *LocalState) saveLocalState(state *LocalState) error {
+	return s.saveFile(s.stateFilePath, state)
 }
 
-func Exists(filename string) bool {
-	_, err := os.Stat(filename)
-	return err == nil
-}
-
-func (s *State) readFile(path string, st interface{}) error {
-	if !Exists(path) {
-		return nil
+func (s *LocalState) readLocalState() error {
+	if _, err := os.Stat(s.stateFilePath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
 	}
 
-	f, err := os.Open(path)
+	f, err := os.Open(s.stateFilePath)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	return json.NewDecoder(f).Decode(st)
-}
-
-func (s *State) GetLocalState() (*LocalState, error) {
-	ls := &LocalState{}
-	if err := s.readFile(stateFile, ls); err != nil {
-		return nil, err
+	err = json.NewDecoder(f).Decode(s)
+	if err != nil {
+		return err
 	}
-	return ls, nil
+	return nil
 }

@@ -64,9 +64,9 @@ func (g *GitHub) DownloadReleaseAsset(tag string) (string, string, error) {
 		release = r
 	}
 
-	slog.Info("tag info", "latest release Tag", *release.TagName)
+	slog.Debug("tag info", "latest release Tag", *release.TagName)
 	for _, asset := range release.Assets {
-		slog.Info("assets info", "name", asset.Name, "download url", asset.URL)
+		slog.Debug("assets info", "name", asset.Name, "download url", asset.URL)
 		if g.regPackageNamePattern.MatchString(*asset.Name) {
 			filePath := filepath.Join(g.config.SaveAssetsPath, *asset.Name)
 
