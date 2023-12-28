@@ -59,13 +59,13 @@ func deploy(cmd, tag, file string) error {
 	return nil
 }
 
-func handleRollout(config *lib.Config, github *lib.GitHub) error {
+func handleRollout(config *lib.Config, github lib.GibHuber) error {
 	state, err := lib.NewState(config)
 	if err != nil {
 		return err
 	}
 
-	localState, err := lib.NewLocalState(lib.StateFilePath)
+	localState, err := lib.NewLocalState(config.StateFilePath)
 	if err != nil {
 		return err
 	}
@@ -111,13 +111,13 @@ func handleRollout(config *lib.Config, github *lib.GitHub) error {
 
 }
 
-func handleCanaryRelease(config *lib.Config, github *lib.GitHub) error {
+func handleCanaryRelease(config *lib.Config, github lib.GibHuber) error {
 	state, err := lib.NewState(config)
 	if err != nil {
 		return err
 	}
 
-	localState, err := lib.NewLocalState(lib.StateFilePath)
+	localState, err := lib.NewLocalState(config.StateFilePath)
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func handleCanaryRelease(config *lib.Config, github *lib.GitHub) error {
 	return nil
 }
 
-func handleRollback(config *lib.Config, github *lib.GitHub, rollbackTag string) error {
+func handleRollback(config *lib.Config, github lib.GibHuber, rollbackTag string) error {
 	slog.Info("start rollback", "tag", rollbackTag)
 
 	_, downloadFile, err := github.DownloadReleaseAsset(rollbackTag)
@@ -287,7 +287,12 @@ func runHealthCheck(config *lib.Config, tag, file string) error {
 }
 
 func executeCommand(command string, tag, file string) ([]byte, error) {
-	cmd := exec.Command(command)
+	p, err := filepath.Abs(command)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd := exec.Command(p)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("RELEASE_TAG=%s", tag))
 	cmd.Env = append(cmd.Env, fmt.Sprintf("ASSET_FILE=%s", file))
 	out, err := cmd.CombinedOutput()
@@ -437,5 +442,8 @@ func init() {
 
 	rootCmd.PersistentFlags().Int("healthcheck-retry", 3, "retry count of health check")
 	viper.BindPFlag("healthcheck_retry", rootCmd.PersistentFlags().Lookup("healthcheck-retry"))
+
+	rootCmd.PersistentFlags().String("statefile-path", "/var/lib/gacr/state.json", "state file path")
+	viper.BindPFlag("statefile_path", rootCmd.PersistentFlags().Lookup("statefile-path"))
 
 }

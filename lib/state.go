@@ -34,9 +34,9 @@ func NewState(config *Config) (*State, error) {
 	return &State{
 		client:              rc,
 		config:              config,
-		canaryReleaseTagKey: fmt.Sprintf("%s_canary_release_version", config.Repo),
-		stableReleaseTagKey: fmt.Sprintf("%s_stable_release_version", config.Repo),
-		avoidReleaseTagKey:  fmt.Sprintf("%s_avoid_release_version", config.Repo),
+		canaryReleaseTagKey: fmt.Sprintf("%s_canary_release_tag", config.Repo),
+		stableReleaseTagKey: fmt.Sprintf("%s_stable_release_tag", config.Repo),
+		avoidReleaseTagKey:  fmt.Sprintf("%s_avoid_release_tag", config.Repo),
 		rolloutKey:          fmt.Sprintf("%s_rollout", config.Repo),
 	}, nil
 }
@@ -102,7 +102,14 @@ func (s *State) SaveAvoidReleaseTag(tag string) error {
 }
 
 func (s *State) getRelease(key string) (string, error) {
-	return s.client.Get(context.Background(), key).Result()
+	v, err := s.client.Get(context.Background(), key).Result()
+	if err == redis.Nil {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return v, nil
 }
 
 func (s *State) getReleases(key string) ([]string, error) {
@@ -116,8 +123,6 @@ func (s *State) getStableReleaseTag() (string, error) {
 func (s *State) getAvoidReleaseTag() ([]string, error) {
 	return s.getReleases(s.avoidReleaseTagKey)
 }
-
-const StateFilePath = "/var/lib/gacr/state.json"
 
 type LocalState struct {
 	LastInstalledTag string `json:"last_installed_tag"`

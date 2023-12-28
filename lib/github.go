@@ -24,6 +24,10 @@ type GitHub struct {
 	regPackageNamePattern *regexp.Regexp
 }
 
+type GibHuber interface {
+	DownloadReleaseAsset(tag string) (string, string, error)
+}
+
 func NewGitHub(config *Config) (*GitHub, error) {
 	token := config.GitHubToken
 	if token == "" {

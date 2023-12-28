@@ -26,4 +26,5 @@ type Config struct {
 	Redis                    *RedisConfig  `mapstructure:"redis" validate:"required"`
 	LogLevel                 string        `mapstructure:"log_level"`
 	HealthCheckRetry         uint          `mapstructure:"healthcheck_retry" validate:"required"`
+	StateFilePath            string        `mapstructure:"state_file_path" validate:"required"`
 }
