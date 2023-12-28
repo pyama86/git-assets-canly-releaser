@@ -12,15 +12,19 @@ import (
 )
 
 type State struct {
-	client *redis.Client
-	config *Config
+	client              *redis.Client
+	canaryReleaseTagKey string
+	stableReleaseTagKey string
+	avoidReleaseTagKey  string
+	rolloutKey          string
+	config              *Config
 }
 
 const stateFile = "/var/lib/gacr/state.json"
 
 func NewState(config *Config) (*State, error) {
 	rc := redis.NewClient(&redis.Options{
-		Addr:     config.Redis.Host,
+		Addr:     fmt.Sprintf("%s:%d", config.Redis.Host, config.Redis.Port),
 		Password: config.Redis.Password,
 		DB:       config.Redis.DB,
 	})
@@ -29,30 +33,34 @@ func NewState(config *Config) (*State, error) {
 		return nil, fmt.Errorf("failed to create redis client: %s", err)
 	}
 	return &State{
-		client: rc,
-		config: config,
+		client:              rc,
+		config:              config,
+		canaryReleaseTagKey: fmt.Sprintf("%s_canary_release_version", config.Repo),
+		stableReleaseTagKey: fmt.Sprintf("%s_stable_release_version", config.Repo),
+		avoidReleaseTagKey:  fmt.Sprintf("%s_avoid_release_version", config.Repo),
+		rolloutKey:          fmt.Sprintf("%s_rollout", config.Repo),
 	}, nil
 }
 
 func (s *State) UnlockCanaryRelease() error {
-	return s.client.Del(context.Background(), s.config.Repo+s.config.CanaryReleaseVersionKey).Err()
+	return s.client.Del(context.Background(), s.canaryReleaseTagKey).Err()
 }
 
 func (s *State) TryCanaryReleaseLock(tag string) (bool, error) {
-	return s.getLock(s.config.CanaryReleaseVersionKey, tag, s.config.CanaryRolloutWindow*2)
+	return s.getLock(s.canaryReleaseTagKey, tag, s.config.CanaryRolloutWindow*2)
 }
 
 func (s *State) TryRolloutLock(tag string) (bool, error) {
-	return s.getLock(s.config.RolloutKey, tag, s.config.RolloutWindow)
+	return s.getLock(s.rolloutKey, tag, s.config.RolloutWindow)
 }
 
 func (s *State) getLock(key string, tag string, window time.Duration) (bool, error) {
-	ok, err := s.client.SetNX(context.Background(), s.config.Repo+key, tag, 0).Result()
+	ok, err := s.client.SetNX(context.Background(), key, tag, 0).Result()
 	if err != nil {
 		return false, err
 	}
 	if ok {
-		err := s.client.Expire(context.Background(), s.config.Repo+key, window).Err()
+		err := s.client.Expire(context.Background(), key, window).Err()
 		if err != nil {
 			return false, err
 		}
@@ -62,39 +70,39 @@ func (s *State) getLock(key string, tag string, window time.Duration) (bool, err
 }
 
 func (s *State) saveRelease(key, tag string) error {
-	return s.client.SetEx(context.Background(), s.config.Repo+key, tag, 0).Err()
+	return s.client.Set(context.Background(), key, tag, 0).Err()
 }
 
 func (s *State) saveReleases(key string, tags ...string) error {
-	return s.client.SAdd(context.Background(), s.config.Repo+key, tags).Err()
+	return s.client.SAdd(context.Background(), key, tags).Err()
 }
 
 func (s *State) SaveStableReleaseTag(tag string) error {
-	return s.saveRelease(s.config.StableReleaseVersionKey, tag)
+	return s.saveRelease(s.stableReleaseTagKey, tag)
 }
 
 func (s *State) SaveAvoidReleaseTag(tag string) error {
-	return s.saveReleases(s.config.AvoidReleaseVersionKey, tag)
+	return s.saveReleases(s.avoidReleaseTagKey, tag)
 }
 
 func (s *State) getRelease(key string) (string, error) {
-	return s.client.Get(context.Background(), s.config.Repo+key).Result()
+	return s.client.Get(context.Background(), key).Result()
 }
 
 func (s *State) getReleases(key string) ([]string, error) {
-	return s.client.SMembers(context.Background(), s.config.Repo+key).Result()
+	return s.client.SMembers(context.Background(), key).Result()
 }
 
 func (s *State) GetStableReleaseTag() (string, error) {
-	return s.getRelease(s.config.StableReleaseVersionKey)
+	return s.getRelease(s.stableReleaseTagKey)
 }
 
 func (s *State) GetAvoidReleaseTag() ([]string, error) {
-	return s.getReleases(s.config.AvoidReleaseVersionKey)
+	return s.getReleases(s.avoidReleaseTagKey)
 }
 
-type localState struct {
-	LastInstalledTag string
+type LocalState struct {
+	LastInstalledTag string `json:"last_installed_tag"`
 }
 
 func (s *State) saveFile(path string, c interface{}) error {
@@ -112,7 +120,7 @@ func (s *State) saveFile(path string, c interface{}) error {
 	return json.NewEncoder(f).Encode(c)
 }
 
-func (s *State) SaveLocalState(state *localState) error {
+func (s *State) SaveLocalState(state *LocalState) error {
 	return s.saveFile(stateFile, state)
 }
 
@@ -135,8 +143,8 @@ func (s *State) readFile(path string, st interface{}) error {
 	return json.NewDecoder(f).Decode(st)
 }
 
-func (s *State) GetLocalState() (*localState, error) {
-	ls := &localState{}
+func (s *State) GetLocalState() (*LocalState, error) {
+	ls := &LocalState{}
 	if err := s.readFile(stateFile, ls); err != nil {
 		return nil, err
 	}

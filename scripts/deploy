@@ -1,0 +1,2 @@
+#!/bin/bash
+echo "deploy release_tag:$RELEASE_TAG file:$ASSET_FILE"

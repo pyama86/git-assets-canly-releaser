@@ -12,8 +12,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/google/go-github/github"
-	"golang.org/x/oauth2"
+	"github.com/google/go-github/v55/github"
+	"github.com/k1LoW/go-github-client/v55/factory"
 )
 
 type GitHub struct {
@@ -21,22 +21,16 @@ type GitHub struct {
 	config                *Config
 	owner                 string
 	repo                  string
-	logger                *slog.Logger
 	regPackageNamePattern *regexp.Regexp
 }
 
 func NewGitHub(config *Config) (*GitHub, error) {
-	logger := slog.Default().With("package", "github")
+	token := config.GitHubToken
+	if token == "" {
+		token = os.Getenv("GITHUB_TOKEN")
+	}
 
-	// HTTPクライアントを設定
-	var tc *http.Client
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: config.GitHubToken},
-	)
-	tc = oauth2.NewClient(context.Background(), ts)
-
-	client := github.NewClient(tc)
-
+	client, _ := factory.NewGithubClient()
 	ownerRepo := strings.Split(config.Repo, "/")
 	if len(ownerRepo) != 2 {
 		return nil, fmt.Errorf("invalid repo: %s", config.Repo)
@@ -44,7 +38,6 @@ func NewGitHub(config *Config) (*GitHub, error) {
 	return &GitHub{
 		client:                client,
 		config:                config,
-		logger:                logger,
 		owner:                 ownerRepo[0],
 		repo:                  ownerRepo[1],
 		regPackageNamePattern: regexp.MustCompile(config.PackageNamePattern),
@@ -71,12 +64,11 @@ func (g *GitHub) DownloadReleaseAsset(tag string) (string, string, error) {
 		release = r
 	}
 
-	g.logger.Info("tag info", "Latest release Tag", *release.TagName)
+	slog.Info("tag info", "latest release Tag", *release.TagName)
 	for _, asset := range release.Assets {
-		g.logger.Info("assets info", "name", asset.Name, "download url", asset.URL)
+		slog.Info("assets info", "name", asset.Name, "download url", asset.URL)
 		if g.regPackageNamePattern.MatchString(*asset.Name) {
-
-			filePath := filepath.Join(g.config.AssetsDownloadPath, *asset.Name)
+			filePath := filepath.Join(g.config.SaveAssetsPath, *asset.Name)
 
 			if _, err := os.Stat(filePath); err == nil {
 				return *release.TagName, filePath, nil
@@ -84,12 +76,25 @@ func (g *GitHub) DownloadReleaseAsset(tag string) (string, string, error) {
 				return "", "", err
 			}
 
-			ret, _, err := g.client.Repositories.DownloadReleaseAsset(context.Background(), g.owner, g.repo, *asset.ID)
+			ret, loc, err := g.client.Repositories.DownloadReleaseAsset(context.Background(), g.owner, g.repo, *asset.ID, nil)
 			if err != nil {
 				return "", "", fmt.Errorf("repositories.DownloadReleaseAsset returned error: %v", err)
 			}
 
-			defer ret.Close()
+			if loc != "" {
+				req, err := http.NewRequestWithContext(context.Background(), "GET", loc, nil)
+				if err != nil {
+					return "", "", err
+				}
+				res, err := g.client.Client().Do(req)
+				if err != nil {
+					return "", "", err
+				}
+				ret = res.Body
+				if ret != nil {
+					defer ret.Close()
+				}
+			}
 
 			out, err := os.Create(filePath)
 			if err != nil {
