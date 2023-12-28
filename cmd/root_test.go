@@ -98,7 +98,7 @@ func TestHandleRollout(t *testing.T) {
 
 			config := &lib.Config{
 				Redis: &lib.RedisConfig{
-					Host: "localhost",
+					Host: os.Getenv("REDIS_HOST"),
 					Port: 6379,
 					DB:   0,
 				},
