@@ -23,6 +23,7 @@ type Config struct {
 	RepositryPollingInterval time.Duration `mapstructure:"repository_polling_interval" validate:"required"`
 	PackageNamePattern       string        `mapstructure:"package_name_pattern" validate:"required"`
 	SlackWebhookURL          string        `mapstructure:"slack_webhook_url"`
+	SlackChannel             string        `mapstructure:"slack_channel"`
 	Redis                    *RedisConfig  `mapstructure:"redis" validate:"required"`
 	LogLevel                 string        `mapstructure:"log_level"`
 	HealthCheckRetry         uint          `mapstructure:"healthcheck_retry" validate:"required"`

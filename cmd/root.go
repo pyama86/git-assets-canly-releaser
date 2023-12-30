@@ -19,6 +19,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pyama86/git-assets-canaly-releaser/lib"
+	slogslack "github.com/samber/slog-slack/v2"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -334,7 +335,19 @@ func getLogger(config *lib.Config, level string) (*slog.Logger, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get hostname: %s", err)
 	}
-	return slog.New(slog.NewJSONHandler(logOutput, &ops)).With("host", hostname), nil
+
+	logger := slog.New(slog.NewJSONHandler(logOutput, &ops)).With("host", hostname)
+	if config.SlackWebhookURL != "" {
+		logger = slog.New(
+			slogslack.Option{
+				Level:      logLevel,
+				WebhookURL: config.SlackWebhookURL,
+				Channel:    config.SlackChannel,
+			}.NewSlackHandler(),
+		).With("host", hostname)
+	}
+
+	return logger, nil
 }
 
 func loadConfig() (*lib.Config, error) {
@@ -403,6 +416,9 @@ func init() {
 
 	rootCmd.PersistentFlags().String("slack-webhook-url", "", "Slack webhook URL")
 	viper.BindPFlag("slack_webhook_url", rootCmd.PersistentFlags().Lookup("slack-webhook-url"))
+
+	rootCmd.PersistentFlags().String("slack-channel", "", "Slack channel")
+	viper.BindPFlag("slack_channel", rootCmd.PersistentFlags().Lookup("slack-channel"))
 
 	rootCmd.PersistentFlags().String("redis-host", "127.0.0.1", "Redis host")
 	viper.BindPFlag("redis.host", rootCmd.PersistentFlags().Lookup("redis-host"))
