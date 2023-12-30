@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/pyama86/git-assets-canaly-releaser/lib"
 	redis "github.com/redis/go-redis/v9"
@@ -64,9 +65,9 @@ func TestHandleRollout(t *testing.T) {
 		{
 			name: "Success",
 			githubMockFn: func(m *GitHubMock) {
-				m.On("DownloadReleaseAsset", "stable").Return("stable", "/path/to/stable", nil)
+				m.On("DownloadReleaseAsset", "latest").Return("latest", "assetfile", nil)
 			},
-			tag:     "stable",
+			tag:     "latest",
 			wantErr: false,
 		},
 		{
@@ -102,9 +103,10 @@ func TestHandleRollout(t *testing.T) {
 					Port: 6379,
 					DB:   0,
 				},
-				DeployCommand: "../scripts/deploy",
+				DeployCommand: "../testdata/dummy.sh",
 				StateFilePath: f.Name(),
 			}
+
 			rc := redis.NewClient(&redis.Options{
 				Addr:     fmt.Sprintf("%s:%d", config.Redis.Host, config.Redis.Port),
 				Password: config.Redis.Password,
@@ -115,6 +117,122 @@ func TestHandleRollout(t *testing.T) {
 
 			if err := handleRollout(config, githubMock); (err != nil) != tt.wantErr {
 				t.Errorf("handleRollout() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+type CommandExecutorMock struct {
+	mock.Mock
+}
+
+func (m *CommandExecutorMock) ExecuteCommand(command string, tag string, file string) ([]byte, error) {
+	args := m.Called(command, tag, file)
+	return args.Get(0).([]byte), args.Error(1)
+}
+
+func TestRunHealthCheck(t *testing.T) {
+	tests := []struct {
+		name    string
+		tag     string
+		file    string
+		wantErr bool
+	}{
+		{
+			name:    "Success",
+			tag:     "latest",
+			file:    "assetfile",
+			wantErr: false,
+		},
+		{
+			name:    "Failure",
+			tag:     "v1.0.0",
+			file:    "testfile",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &lib.Config{
+				HealthCheckRetry:    1,
+				HealthCheckCommand:  "../testdata/dummy.sh",
+				HealthCheckInterval: 1 * time.Nanosecond,
+				CanaryRolloutWindow: 3 * time.Nanosecond,
+			}
+
+			if err := runHealthCheck(config, tt.tag, tt.file); (err != nil) != tt.wantErr {
+				t.Errorf("runHealthCheck() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+type StateMock struct {
+	mock.Mock
+}
+
+func (m *StateMock) TryCanaryReleaseLock(tag string) (bool, error) {
+	args := m.Called(tag)
+	return args.Bool(0), args.Error(1)
+}
+
+type LocalStateMock struct {
+	mock.Mock
+}
+
+func (m *LocalStateMock) CanInstallTag(tag string) (bool, error) {
+	args := m.Called(tag)
+	return args.Bool(0), args.Error(1)
+}
+
+func TestHandleCanaryRelease(t *testing.T) {
+	tests := []struct {
+		name         string
+		tag          string
+		file         string
+		githubMockFn func(*GitHubMock)
+		wantErr      bool
+	}{
+		{
+			name: "Success",
+			githubMockFn: func(m *GitHubMock) {
+				m.On("DownloadReleaseAsset", lib.LatestTag).Return("latest", "assetfile", nil)
+			},
+			tag:     "latest",
+			file:    "assetfile",
+			wantErr: false,
+		},
+		{
+			name: "Failure",
+			githubMockFn: func(m *GitHubMock) {
+				m.On("DownloadReleaseAsset", lib.LatestTag).Return("", "", errors.New("failed to download"))
+			},
+			tag:     "v1.0.0",
+			file:    "testfile",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			githubMock := new(GitHubMock)
+			tt.githubMockFn(githubMock)
+			config := &lib.Config{
+				DeployCommand: "../testdata/dummy.sh",
+				Redis: &lib.RedisConfig{
+					Host: os.Getenv("REDIS_HOST"),
+					Port: 6379,
+					DB:   0,
+				},
+				HealthCheckRetry:    1,
+				HealthCheckCommand:  "../testdata/dummy.sh",
+				HealthCheckInterval: 1 * time.Nanosecond,
+				CanaryRolloutWindow: 3 * time.Nanosecond,
+				StateFilePath:       "../testdata/state.json",
+			}
+			if err := handleCanaryRelease(config, githubMock); (err != nil) != tt.wantErr {
+				t.Errorf("handleCanaryRelease() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

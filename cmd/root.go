@@ -125,7 +125,6 @@ func handleCanaryRelease(config *lib.Config, github lib.GibHuber) error {
 	latestTag, downloadFile, err := github.DownloadReleaseAsset(lib.LatestTag)
 	if err != nil {
 		if errors.Is(err, lib.ErrAssetsNotFound) {
-			slog.Info("latest release notfound")
 			if viper.GetBool("once") {
 				return nil
 			}
@@ -268,8 +267,9 @@ func runHealthCheck(config *lib.Config, tag, file string) error {
 			retry.Delay(5*time.Second),
 		)
 	}
-	slog.Info("start health check", "tag", tag)
+	slog.Info("start health check", "tag", tag, "file", file)
 	if err := f(); err != nil {
+		slog.Error("health check failed", "tag", tag, "file", file, "err", err)
 		return err
 	}
 
