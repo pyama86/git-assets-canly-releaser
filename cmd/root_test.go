@@ -3,237 +3,285 @@ package cmd
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/pyama86/git-assets-canaly-releaser/lib"
+	"github.com/pyama86/git-assets-canaly-releaser/testutils"
 	redis "github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/mock"
+	"github.com/tj/assert"
+	"go.uber.org/mock/gomock"
 )
 
-func TestDeploy(t *testing.T) {
-	tests := []struct {
-		name    string
-		cmd     string
-		tag     string
-		file    string
-		wantErr bool
-	}{
-		{
-			name:    "Success",
-			cmd:     "../testdata/dummy.sh",
-			tag:     "latest",
-			file:    "assetfile",
-			wantErr: false,
-		},
-		{
-			name:    "Failure",
-			cmd:     "../testdata/dummy.sh",
-			tag:     "v1.0.0",
-			file:    "testfile",
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := deploy(tt.cmd, tt.tag, tt.file); (err != nil) != tt.wantErr {
-				t.Errorf("deploy() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-type GitHubMock struct {
+// MockGitHuber is a mock type for the GitHuber interface
+type MockGitHuber struct {
 	mock.Mock
 }
 
-func (m *GitHubMock) DownloadReleaseAsset(tag string) (string, string, error) {
+// DownloadReleaseAsset mocks the DownloadReleaseAsset method
+func (m *MockGitHuber) DownloadReleaseAsset(tag string) (string, string, error) {
 	args := m.Called(tag)
 	return args.String(0), args.String(1), args.Error(2)
 }
 
-func TestHandleRollout(t *testing.T) {
+func TestDeploy(t *testing.T) {
 	tests := []struct {
-		name         string
-		githubMockFn func(*GitHubMock)
-		wantErr      bool
-		tag          string
+		name      string
+		cmd       string
+		tag       string
+		mockSetup func(*MockGitHuber)
+		wantTag   string
+		wantFile  string
+		wantErr   bool
 	}{
 		{
-			name: "Success",
-			githubMockFn: func(m *GitHubMock) {
+			name: "Successful deployment",
+			cmd:  "../testdata/dummy.sh",
+			tag:  "latest",
+			mockSetup: func(m *MockGitHuber) {
 				m.On("DownloadReleaseAsset", "latest").Return("latest", "assetfile", nil)
 			},
-			tag:     "latest",
-			wantErr: false,
+			wantTag:  "latest",
+			wantFile: "assetfile",
+			wantErr:  false,
 		},
 		{
-			name: "Failure",
-			githubMockFn: func(m *GitHubMock) {
-				m.On("DownloadReleaseAsset", "stable").Return("", "", errors.New("failed to download"))
+			name: "Failed to download asset",
+			cmd:  "echo",
+			tag:  "v1.0.0",
+			mockSetup: func(m *MockGitHuber) {
+				m.On("DownloadReleaseAsset", "v1.0.0").Return("", "", errors.New("download error"))
 			},
-			tag:     "stable",
 			wantErr: true,
-		},
-		{
-			name:    "Avoid",
-			tag:     "avoid",
-			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			githubMock := new(GitHubMock)
-			if tt.githubMockFn != nil {
-				tt.githubMockFn(githubMock)
+			mockGitHub := new(MockGitHuber)
+			tt.mockSetup(mockGitHub)
+
+			tag, file, err := deploy(tt.cmd, tt.tag, mockGitHub)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantTag, tag)
+				assert.Equal(t, tt.wantFile, file)
 			}
-			f, err := os.CreateTemp("", tt.name)
+
+			mockGitHub.AssertExpectations(t)
+		})
+	}
+}
+
+func TestHandleRollout(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	redisClient := testutils.RedisClient()
+	testCases := []struct {
+		name          string
+		mockSetup     func(*MockGitHuber)
+		expectedError bool
+		wantError     error
+		before        func(redisClient *redis.Client, statefile string)
+	}{
+		{
+			name: "Successful Rollout",
+			mockSetup: func(m *MockGitHuber) {
+				m.On("DownloadReleaseAsset", "latest").Return("latest", "assetfile", nil)
+			},
+			expectedError: false,
+			before: func(redisClient *redis.Client, statefile string) {
+				redisClient.Set(context.Background(), "foo/bar_stable_release_tag", "latest", 0)
+			},
+		},
+		{
+			name: "Already installed",
+			mockSetup: func(m *MockGitHuber) {
+				m.On("DownloadReleaseAsset", "latest").Return("latest", "assetfile", nil)
+			},
+			expectedError: true,
+			before: func(redisClient *redis.Client, statefile string) {
+				redisClient.Set(context.Background(), "foo/bar_stable_release_tag", "already_installed", 0)
+
+				f, err := os.Create(statefile)
+				if err != nil {
+					t.Fatal(err)
+				}
+				f.WriteString(`{"last_installed_tag":"already_installed"}`)
+				f.Close()
+			},
+			wantError: lib.ErrAlreadyInstalled,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			f, err := os.CreateTemp("../tmp", "state.json")
 			if err != nil {
 				t.Fatal(err)
 			}
-			os.Remove(f.Name())
-
 			config := &lib.Config{
+				Repo: "foo/bar",
 				Redis: &lib.RedisConfig{
-					Host: os.Getenv("REDIS_HOST"),
+					Host: "localhost",
 					Port: 6379,
-					DB:   0,
 				},
 				DeployCommand: "../testdata/dummy.sh",
 				StateFilePath: f.Name(),
 			}
+			os.Remove(config.StateFilePath)
 
-			rc := redis.NewClient(&redis.Options{
-				Addr:     fmt.Sprintf("%s:%d", config.Redis.Host, config.Redis.Port),
-				Password: config.Redis.Password,
-				DB:       config.Redis.DB,
-			})
-			rc.Set(context.Background(), "_stable_release_tag", tt.tag, 0)
-			rc.SAdd(context.Background(), "_avoid_release_tag", "avoid", 0)
+			state, err := lib.NewState(config)
+			assert.NoError(t, err)
+			mockGitHub := new(MockGitHuber)
+			tc.mockSetup(mockGitHub)
+			tc.before(redisClient, f.Name())
 
-			if err := handleRollout(config, githubMock); (err != nil) != tt.wantErr {
-				t.Errorf("handleRollout() error = %v, wantErr %v", err, tt.wantErr)
+			err = handleRollout(config, mockGitHub, state)
+			if tc.expectedError {
+				assert.Error(t, err)
+				if tc.wantError != nil {
+					assert.Equal(t, tc.wantError, err)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, "latest", state.LastInstalledTag)
 			}
 		})
 	}
 }
 
-type CommandExecutorMock struct {
-	mock.Mock
-}
+func TestHandleCanaryRollout(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-func (m *CommandExecutorMock) ExecuteCommand(command string, tag string, file string) ([]byte, error) {
-	args := m.Called(command, tag, file)
-	return args.Get(0).([]byte), args.Error(1)
-}
-
-func TestRunHealthCheck(t *testing.T) {
-	tests := []struct {
-		name    string
-		tag     string
-		file    string
-		wantErr bool
+	redisClient := testutils.RedisClient()
+	testCases := []struct {
+		name               string
+		mockSetup          func(*MockGitHuber)
+		expectedError      bool
+		wantError          error
+		healthCheckCommand string
+		rollbackCommand    string
+		before             func(redisClient *redis.Client, statefile string)
 	}{
 		{
-			name:    "Success",
-			tag:     "latest",
-			file:    "assetfile",
-			wantErr: false,
+			name: "Successful Rollout",
+			mockSetup: func(m *MockGitHuber) {
+				m.On("DownloadReleaseAsset", "latest").Return("latest", "assetfile", nil)
+			},
+			expectedError: false,
+			before: func(redisClient *redis.Client, statefile string) {
+				redisClient.Set(context.Background(), "foo/bar_stable_release_tag", "latest", 0)
+				redisClient.Del(context.Background(), "foo/bar_avoid_release_tag")
+			},
 		},
 		{
-			name:    "Failure",
-			tag:     "v1.0.0",
-			file:    "testfile",
-			wantErr: true,
+			name: "Already installed",
+			mockSetup: func(m *MockGitHuber) {
+				m.On("DownloadReleaseAsset", "latest").Return("latest", "assetfile", nil)
+			},
+			expectedError: true,
+			before: func(redisClient *redis.Client, statefile string) {
+				redisClient.Set(context.Background(), "foo/bar_stable_release_tag", "latest", 0)
+				redisClient.Del(context.Background(), "foo/bar_avoid_release_tag")
+
+				f, err := os.Create(statefile)
+				if err != nil {
+					t.Fatal(err)
+				}
+				f.WriteString(`{"last_installed_tag":"latest"}`)
+				f.Close()
+			},
+			wantError: lib.ErrAlreadyInstalled,
+		},
+		{
+			name: "Rollback",
+			mockSetup: func(m *MockGitHuber) {
+				m.On("DownloadReleaseAsset", "latest").Return("latest", "assetfile", nil)
+				m.On("DownloadReleaseAsset", "stable").Return("stable", "assetfile", nil)
+			},
+			expectedError: true,
+			before: func(redisClient *redis.Client, statefile string) {
+				redisClient.Del(context.Background(), "foo/bar_avoid_release_tag")
+				redisClient.Set(context.Background(), "foo/bar_stable_release_tag", "stable", 0)
+
+				f, err := os.Create(statefile)
+				if err != nil {
+					t.Fatal(err)
+				}
+				f.WriteString(`{"last_installed_tag":"already_installed"}`)
+				f.Close()
+			},
+			healthCheckCommand: "../testdata/always_fail.sh",
+			rollbackCommand:    "../testdata/always_succes.sh",
+			wantError:          ErrRollback,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			config := &lib.Config{
-				HealthCheckRetry:    1,
-				HealthCheckCommand:  "../testdata/dummy.sh",
-				HealthCheckInterval: 1 * time.Nanosecond,
-				CanaryRolloutWindow: 3 * time.Nanosecond,
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			f, err := os.CreateTemp("../tmp", "state.json")
+			if err != nil {
+				t.Fatal(err)
 			}
 
-			if err := runHealthCheck(config, tt.tag, tt.file); (err != nil) != tt.wantErr {
-				t.Errorf("runHealthCheck() error = %v, wantErr %v", err, tt.wantErr)
+			healthCheckCommand := "../testdata/dummy.sh"
+			if tc.healthCheckCommand != "" {
+				healthCheckCommand = tc.healthCheckCommand
 			}
-		})
-	}
-}
+			rollbackCommand := "../testdata/dummy.sh"
+			if tc.rollbackCommand != "" {
+				rollbackCommand = tc.rollbackCommand
+			}
 
-type StateMock struct {
-	mock.Mock
-}
-
-func (m *StateMock) TryCanaryReleaseLock(tag string) (bool, error) {
-	args := m.Called(tag)
-	return args.Bool(0), args.Error(1)
-}
-
-type LocalStateMock struct {
-	mock.Mock
-}
-
-func (m *LocalStateMock) CanInstallTag(tag string) (bool, error) {
-	args := m.Called(tag)
-	return args.Bool(0), args.Error(1)
-}
-
-func TestHandleCanaryRelease(t *testing.T) {
-	tests := []struct {
-		name         string
-		tag          string
-		file         string
-		githubMockFn func(*GitHubMock)
-		wantErr      bool
-	}{
-		{
-			name: "Success",
-			githubMockFn: func(m *GitHubMock) {
-				m.On("DownloadReleaseAsset", lib.LatestTag).Return("latest", "assetfile", nil)
-			},
-			tag:     "latest",
-			file:    "assetfile",
-			wantErr: false,
-		},
-		{
-			name: "Failure",
-			githubMockFn: func(m *GitHubMock) {
-				m.On("DownloadReleaseAsset", lib.LatestTag).Return("", "", errors.New("failed to download"))
-			},
-			tag:     "v1.0.0",
-			file:    "testfile",
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			githubMock := new(GitHubMock)
-			tt.githubMockFn(githubMock)
 			config := &lib.Config{
-				DeployCommand: "../testdata/dummy.sh",
+				Repo: "foo/bar",
 				Redis: &lib.RedisConfig{
-					Host: os.Getenv("REDIS_HOST"),
+					Host: "localhost",
 					Port: 6379,
-					DB:   0,
 				},
-				HealthCheckRetry:    1,
-				HealthCheckCommand:  "../testdata/dummy.sh",
-				HealthCheckInterval: 1 * time.Nanosecond,
-				CanaryRolloutWindow: 3 * time.Nanosecond,
-				StateFilePath:       "../testdata/state.json",
+				DeployCommand:       "../testdata/dummy.sh",
+				HealthCheckCommand:  healthCheckCommand,
+				RollbackCommand:     rollbackCommand,
+				StateFilePath:       f.Name(),
+				HealthCheckInterval: time.Nanosecond,
+				HealthCheckTimeout:  time.Second,
+				HealthCheckRetries:  1,
+				CanaryRolloutWindow: time.Nanosecond,
 			}
-			if err := handleCanaryRelease(config, githubMock); (err != nil) != tt.wantErr {
-				t.Errorf("handleCanaryRelease() error = %v, wantErr %v", err, tt.wantErr)
+			os.Remove(config.StateFilePath)
+
+			state, err := lib.NewState(config)
+			assert.NoError(t, err)
+			mockGitHub := new(MockGitHuber)
+			tc.mockSetup(mockGitHub)
+			tc.before(redisClient, f.Name())
+
+			err = handleCanaryRelease(config, mockGitHub, state)
+			if tc.expectedError {
+				assert.Error(t, err)
+				if tc.wantError != nil {
+					assert.Equal(t, tc.wantError, err)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, "latest", state.LastInstalledTag)
+
+				stableTag, err := redisClient.Get(context.Background(), "foo/bar_stable_release_tag").Result()
+				assert.NoError(t, err)
+				assert.Equal(t, "latest", stableTag)
+
+				_, err = redisClient.Get(context.Background(), "foo/bar_canary_release_tag").Result()
+				assert.Error(t, err)
 			}
+
 		})
 	}
 }

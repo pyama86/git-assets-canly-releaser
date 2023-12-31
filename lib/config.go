@@ -26,6 +26,7 @@ type Config struct {
 	SlackChannel             string        `mapstructure:"slack_channel"`
 	Redis                    *RedisConfig  `mapstructure:"redis" validate:"required"`
 	LogLevel                 string        `mapstructure:"log_level"`
-	HealthCheckRetry         uint          `mapstructure:"healthcheck_retry" validate:"required"`
+	HealthCheckRetries       uint          `mapstructure:"healthcheck_retries" validate:"required"`
+	HealthCheckTimeout       time.Duration `mapstructure:"healthcheck_timeout" validate:"required"`
 	StateFilePath            string        `mapstructure:"state_file_path" validate:"required"`
 }

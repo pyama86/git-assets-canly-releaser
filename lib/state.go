@@ -12,6 +12,12 @@ import (
 	redis "github.com/redis/go-redis/v9"
 )
 
+type Stater interface {
+	CurrentStableTag() (string, error)
+	CanInstallTag(tag string) error
+	TryRolloutLock(tag string) (bool, error)
+}
+
 type State struct {
 	client              *redis.Client
 	canaryReleaseTagKey string
@@ -19,6 +25,10 @@ type State struct {
 	avoidReleaseTagKey  string
 	rolloutKey          string
 	config              *Config
+
+	// localstate
+	LastInstalledTag string `json:"last_installed_tag"`
+	stateFilePath    string
 }
 
 func NewState(config *Config) (*State, error) {
@@ -38,6 +48,7 @@ func NewState(config *Config) (*State, error) {
 		stableReleaseTagKey: fmt.Sprintf("%s_stable_release_tag", config.Repo),
 		avoidReleaseTagKey:  fmt.Sprintf("%s_avoid_release_tag", config.Repo),
 		rolloutKey:          fmt.Sprintf("%s_rollout", config.Repo),
+		stateFilePath:       config.StateFilePath,
 	}, nil
 }
 
@@ -71,17 +82,10 @@ func (s *State) CurrentStableTag() (string, error) {
 	return s.getRelease(s.stableReleaseTagKey)
 }
 
-func (s *State) IsAvoidReleaseTag(tag string) (bool, error) {
-	tags, err := s.getReleases(s.avoidReleaseTagKey)
-	if err != nil {
-		return false, err
-	}
-	for _, t := range tags {
-		if t == tag {
-			return true, nil
-		}
-	}
-	return false, nil
+var ErrAvoidReleaseTag = errors.New("avoid release tag")
+
+func (s *State) IsAvoidReleaseTag(tag string) error {
+	return nil
 
 }
 
@@ -116,63 +120,65 @@ func (s *State) getReleases(key string) ([]string, error) {
 	return s.client.SMembers(context.Background(), key).Result()
 }
 
-type LocalState struct {
-	LastInstalledTag string `json:"last_installed_tag"`
-	stateFilePath    string
-}
-
-func NewLocalState(f string) (*LocalState, error) {
-	return &LocalState{
-		stateFilePath: f,
-	}, nil
-}
-
-func (s *LocalState) SaveLastInstalledTag(tag string) error {
+func (s *State) SaveLastInstalledTag(tag string) error {
 	s.LastInstalledTag = tag
-	return s.saveLocalState(s)
+	return s.saveLocalState()
 }
 
-func (s *LocalState) CanInstallTag(tag string) (bool, error) {
+var ErrAlreadyInstalled = errors.New("already installed")
+
+func (s *State) CanInstallTag(tag string) error {
+	if tag == "" {
+		return errors.New("tag is empty")
+	}
 	lastInstalledTag, err := s.getLastInstalledTag()
 	if err != nil {
-		return false, err
+		return err
 	}
 	if lastInstalledTag == "" {
-		return true, nil
+		return nil
 	}
 	if lastInstalledTag == tag {
-		return false, nil
+		return ErrAlreadyInstalled
 	}
-	return true, nil
+
+	tags, err := s.getReleases(s.avoidReleaseTagKey)
+	if err != nil {
+		return err
+	}
+	for _, t := range tags {
+		if t == tag {
+			return ErrAvoidReleaseTag
+		}
+	}
+
+	return nil
 }
 
-func (s *LocalState) getLastInstalledTag() (string, error) {
+func (s *State) getLastInstalledTag() (string, error) {
 	if err := s.readLocalState(); err != nil {
 		return "", err
 	}
 	return s.LastInstalledTag, nil
 }
 
-func (s *LocalState) saveFile(path string, c interface{}) error {
-	dir := path[:len(path)-len(path[strings.LastIndex(path, "/"):])]
+func (s *State) saveLocalState() error {
+	dir := s.stateFilePath[:len(s.stateFilePath)-len(s.stateFilePath[strings.LastIndex(s.stateFilePath, "/"):])]
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
 
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	f, err := os.OpenFile(s.stateFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
 
 	defer f.Close()
-	return json.NewEncoder(f).Encode(c)
+	return json.NewEncoder(f).Encode(s)
+
 }
 
-func (s *LocalState) saveLocalState(state *LocalState) error {
-	return s.saveFile(s.stateFilePath, state)
-}
-
-func (s *LocalState) readLocalState() error {
+func (s *State) readLocalState() error {
 	if _, err := os.Stat(s.stateFilePath); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -191,4 +197,20 @@ func (s *LocalState) readLocalState() error {
 		return err
 	}
 	return nil
+}
+
+func (s *State) RollbackTag() (string, error) {
+	stableRelease, err := s.CurrentStableTag()
+	if err != nil {
+		return "", err
+	}
+
+	rollbackTag := stableRelease
+	if rollbackTag == "" {
+		rollbackTag = s.LastInstalledTag
+	}
+	if rollbackTag == "" {
+		return "", fmt.Errorf("can't decided rollback tag")
+	}
+	return rollbackTag, nil
 }

@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -52,162 +53,104 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func deploy(cmd, tag, file string) error {
-	out, err := executeCommand(cmd, tag, file)
+func deploy(cmd, tag string, github lib.GitHuber) (string, string, error) {
+	tag, downloadFile, err := github.DownloadReleaseAsset(tag)
 	if err != nil {
-		return fmt.Errorf("failed to execute command: %s, %s", err, out)
+		return "", "", fmt.Errorf("can't get release asset:%s %s", tag, err)
 	}
-	return nil
+
+	out, err := executeCommand(cmd, tag, downloadFile)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to execute command: %s, %s", err, out)
+	}
+	return tag, downloadFile, nil
 }
 
-func handleRollout(config *lib.Config, github lib.GibHuber) error {
-	state, err := lib.NewState(config)
+func lockAndRoll(tag, cmd string, github lib.GitHuber, state *lib.State, afterDeploy func(string, string, error) error) error {
+	err := state.CanInstallTag(tag)
 	if err != nil {
 		return err
 	}
 
-	localState, err := lib.NewLocalState(config.StateFilePath)
-	if err != nil {
-		return err
-	}
-	stableRelease, err := state.CurrentStableTag()
+	got, err := state.TryRolloutLock(tag)
 	if err != nil {
 		return err
 	}
 
-	avoid, err := state.IsAvoidReleaseTag(stableRelease)
-	if err != nil {
-		return err
-	}
-
-	canInstall, err := localState.CanInstallTag(stableRelease)
-	if err != nil {
-		return err
-	}
-
-	if stableRelease != "" &&
-		canInstall &&
-		!avoid {
-
-		got, err := state.TryRolloutLock(stableRelease)
-		if err != nil {
-			return err
-		}
-
-		if got {
-			_, downloadFile, err := github.DownloadReleaseAsset(stableRelease)
-			if err != nil {
-				return fmt.Errorf("can't get release asset:%s %s", stableRelease, err)
-			}
-
-			if err := deploy(config.DeployCommand, stableRelease, downloadFile); err != nil {
-				return fmt.Errorf("deploy command failed: %s", err)
-			}
-			if err := localState.SaveLastInstalledTag(stableRelease); err != nil {
+	if got {
+		if tag, file, err := deploy(cmd, tag, github); err != nil {
+			return fmt.Errorf("deploy command failed: %s", err)
+		} else {
+			if err := afterDeploy(tag, file, err); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
-
 }
 
-func handleCanaryRelease(config *lib.Config, github lib.GibHuber) error {
-	state, err := lib.NewState(config)
-	if err != nil {
-		return err
-	}
-
-	localState, err := lib.NewLocalState(config.StateFilePath)
-	if err != nil {
-		return err
-	}
-
-	latestTag, downloadFile, err := github.DownloadReleaseAsset(lib.LatestTag)
-	if err != nil {
-		if errors.Is(err, lib.ErrAssetsNotFound) {
-			if viper.GetBool("once") {
-				return nil
-			}
-			return nil
-		} else {
-			return err
-		}
-	}
-
-	avoid, err := state.IsAvoidReleaseTag(latestTag)
-	if err != nil {
-		return err
-	}
-
+func handleRollout(config *lib.Config, github lib.GitHuber, state *lib.State) error {
 	stableRelease, err := state.CurrentStableTag()
 	if err != nil {
 		return err
 	}
 
-	canInstall, err := localState.CanInstallTag(stableRelease)
-	if err != nil {
+	return lockAndRoll(stableRelease, config.DeployCommand, github, state, func(tag, filename string, err error) error {
+		if err == nil {
+			if err := state.SaveLastInstalledTag(stableRelease); err != nil {
+				return err
+			}
+		}
 		return err
-	}
+	})
+}
 
-	if canInstall && !avoid {
-		got, err := state.TryCanaryReleaseLock(latestTag)
+func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.State) error {
+	if err := lockAndRoll(lib.LatestTag, config.DeployCommand, github, state, func(tag, filename string, err error) error {
 		if err != nil {
 			return err
-		}
-		if got {
-			slog.Info("canary release locked", "tag", latestTag)
-			if err := deploy(config.DeployCommand, latestTag, downloadFile); err != nil {
-				return fmt.Errorf("deploy command failed: %s", err)
-			}
-
-			slog.Info("deploy command success", "tag", latestTag)
-			if err := runHealthCheck(config, latestTag, downloadFile); err != nil {
-				slog.Error("health check command failed", err)
-				if err := state.SaveAvoidReleaseTag(latestTag); err != nil {
+		} else {
+			slog.Info("deploy command success", "tag", tag)
+			if out, err := runHealthCheck(config, tag, filename); err != nil {
+				slog.Error("health check command failed", slog.String("err", err.Error()), slog.String("out", out))
+				if err := state.SaveAvoidReleaseTag(tag); err != nil {
 					return fmt.Errorf("can't save avoid tag:%s", err)
 				}
 
 				// try rollback
-				rollbackTag := stableRelease
-				if rollbackTag == "" {
-					rollbackTag = localState.LastInstalledTag
+				rollbackTag, err := state.RollbackTag()
+				if err != nil {
+					return err
 				}
-				if rollbackTag == "" {
-					return fmt.Errorf("can't decided rollback tag")
-				}
-
-				return handleRollback(config, github, rollbackTag)
+				return handleRollback(rollbackTag, config, github)
 			} else {
-				if err := state.SaveStableReleaseTag(latestTag); err != nil {
+				if err := state.SaveStableReleaseTag(tag); err != nil {
 					return fmt.Errorf("can't save stable tag:%s", err)
 				}
 
 				if err := state.UnlockCanaryRelease(); err != nil {
 					return fmt.Errorf("can't unlock canary release tag")
 				}
-				slog.Info("canary release success", "tag", latestTag)
-				return localState.SaveLastInstalledTag(latestTag)
-			}
 
+				slog.Info("canary release success", "tag", tag)
+				return state.SaveLastInstalledTag(tag)
+			}
 		}
+	}); err != nil {
+		return err
 	}
 	return nil
 }
 
-func handleRollback(config *lib.Config, github lib.GibHuber, rollbackTag string) error {
+var ErrRollback = errors.New("rollback")
+
+func handleRollback(rollbackTag string, config *lib.Config, github lib.GitHuber) error {
 	slog.Info("start rollback", "tag", rollbackTag)
-
-	_, downloadFile, err := github.DownloadReleaseAsset(rollbackTag)
-	if errors.Is(err, lib.ErrAssetsNotFound) {
-		return fmt.Errorf("can't get release asset:%s", rollbackTag)
-	}
-
-	if err := deploy(config.RollbackCommand, rollbackTag, downloadFile); err != nil {
+	if _, _, err := deploy(config.RollbackCommand, rollbackTag, github); err != nil {
 		return fmt.Errorf("rollback error: %s", err)
 	}
 	slog.Info("rollback success", "tag", rollbackTag)
-	return nil
+	return ErrRollback
 
 }
 func runServer(config *lib.Config) error {
@@ -228,18 +171,38 @@ func runServer(config *lib.Config) error {
 	}
 	defer rolloutTicker.Stop()
 
+	state, err := lib.NewState(config)
+	if err != nil {
+		return err
+	}
+
 	for {
 		select {
 		case <-rolloutTicker.C:
-			if err := handleRollout(config, github); err != nil {
-				return err
+			if err := handleRollout(config, github, state); err != nil {
+				if errors.Is(err, lib.ErrAlreadyInstalled) {
+					slog.Debug("can't rollout", "err", err)
+				} else {
+					return err
+				}
 			}
 			if viper.GetBool("once") {
 				rolloutTicker.Stop()
 			}
 		case <-gitTicker.C:
-			if err := handleCanaryRelease(config, github); err != nil {
-				return err
+			if err := handleCanaryRelease(config, github, state); err != nil {
+				if errors.Is(err, lib.ErrAssetsNotFound) ||
+					errors.Is(err, lib.ErrAlreadyInstalled) ||
+					errors.Is(err, lib.ErrAvoidReleaseTag) {
+					slog.Debug("can't rollout", "err", err)
+				} else {
+					if errors.Is(err, ErrRollback) {
+						slog.Error("rollback success")
+					} else {
+						return err
+					}
+				}
+
 			}
 			if viper.GetBool("once") {
 				return nil
@@ -248,41 +211,47 @@ func runServer(config *lib.Config) error {
 	}
 }
 
-func runHealthCheck(config *lib.Config, tag, file string) error {
+func runHealthCheck(config *lib.Config, tag, file string) (string, error) {
 	healthCheckTick := time.NewTicker(config.HealthCheckInterval)
 	defer healthCheckTick.Stop()
 	canaryReleaseTick := time.NewTicker(config.CanaryRolloutWindow)
 	defer canaryReleaseTick.Stop()
 
-	f := func() error {
-		return retry.Do(
+	f := func() (string, error) {
+		ret := ""
+		cxt, cancel := context.WithTimeout(context.Background(), config.HealthCheckTimeout)
+		defer cancel()
+		err := retry.Do(
 			func() error {
 				out, err := executeCommand(config.HealthCheckCommand, tag, file)
+				ret = string(out)
 				if err != nil {
-					return fmt.Errorf("health check command failed: %s, %s", err, out)
+					return fmt.Errorf("health check command failed: %s, %s", err.Error(), string(out))
 				}
 				return nil
 
 			},
-			retry.Attempts(config.HealthCheckRetry),
+			retry.Context(cxt),
+			retry.Attempts(config.HealthCheckRetries),
 			retry.Delay(5*time.Second),
 		)
+		return ret, err
 	}
 	slog.Info("start health check", "tag", tag, "file", file)
-	if err := f(); err != nil {
-		slog.Error("health check failed", "tag", tag, "file", file, "err", err)
-		return err
+	if out, err := f(); err != nil {
+		slog.Error("health check failed", "tag", tag, "file", file, "err", err, "out", out)
+		return out, err
 	}
 
 	for {
 		select {
 		case <-healthCheckTick.C:
-			if err := f(); err != nil {
-				return err
+			if out, err := f(); err != nil {
+				return out, err
 			}
 
 		case <-canaryReleaseTick.C:
-			return nil
+			return "", nil
 		}
 	}
 }
@@ -296,6 +265,7 @@ func executeCommand(command string, tag, file string) ([]byte, error) {
 	cmd := exec.Command(p)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("RELEASE_TAG=%s", tag))
 	cmd.Env = append(cmd.Env, fmt.Sprintf("ASSET_FILE=%s", file))
+
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, err
@@ -456,8 +426,11 @@ func init() {
 	rootCmd.PersistentFlags().Bool("once", false, "one shot mode")
 	viper.BindPFlag("once", rootCmd.PersistentFlags().Lookup("once"))
 
-	rootCmd.PersistentFlags().Int("healthcheck-retry", 3, "retry count of health check")
-	viper.BindPFlag("healthcheck_retry", rootCmd.PersistentFlags().Lookup("healthcheck-retry"))
+	rootCmd.PersistentFlags().Int("healthcheck-retries", 3, "retry count of health check")
+	viper.BindPFlag("healthcheck_retries", rootCmd.PersistentFlags().Lookup("healthcheck-retries"))
+
+	rootCmd.PersistentFlags().Duration("healthcheck-timeout", 30*time.Second, "timeout of health check")
+	viper.BindPFlag("healthcheck_timeout", rootCmd.PersistentFlags().Lookup("healthcheck-timeout"))
 
 	rootCmd.PersistentFlags().String("statefile-path", "/var/lib/gacr/state.json", "state file path")
 	viper.BindPFlag("statefile_path", rootCmd.PersistentFlags().Lookup("statefile-path"))

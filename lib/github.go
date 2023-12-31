@@ -24,7 +24,7 @@ type GitHub struct {
 	regPackageNamePattern *regexp.Regexp
 }
 
-type GibHuber interface {
+type GitHuber interface {
 	DownloadReleaseAsset(tag string) (string, string, error)
 }
 
