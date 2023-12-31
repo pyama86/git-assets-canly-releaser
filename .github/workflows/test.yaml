@@ -33,5 +33,4 @@ jobs:
     - name: Test
       run: make ci
       env:
-        REDIS_HOST: redis
         GACR_REDIS_HOST: redis

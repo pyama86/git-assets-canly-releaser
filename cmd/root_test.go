@@ -126,7 +126,7 @@ func TestHandleRollout(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			redisHost := os.Getenv("REDIS_HOST")
+			redisHost := os.Getenv("GACR_REDIS_HOST")
 			if redisHost == "" {
 				redisHost = "localhost"
 			}
@@ -245,7 +245,7 @@ func TestHandleCanaryRollout(t *testing.T) {
 				rollbackCommand = tc.rollbackCommand
 			}
 
-			redisHost := os.Getenv("REDIS_HOST")
+			redisHost := os.Getenv("GACR_REDIS_HOST")
 			if redisHost == "" {
 				redisHost = "localhost"
 			}
