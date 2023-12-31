@@ -8,8 +8,8 @@ import (
 
 func RedisClient() *redis.Client {
 	redisURL := "localhost:6379"
-	if os.Getenv("GACR_REDIS_URL") != "" {
-		redisURL = os.Getenv("GACR_REDIS_URL")
+	if os.Getenv("GACR_REDIS_HOST") != "" {
+		redisURL = os.Getenv("GACR_REDIS_HOST") + ":6379"
 	}
 	return redis.NewClient(&redis.Options{
 		Addr:     redisURL,
