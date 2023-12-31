@@ -25,3 +25,10 @@ lint: devdeps
 devdeps:
 	@which staticcheck > /dev/null || go install honnef.co/go/tools/cmd/staticcheck@latest
 
+release_deps:
+	which goreleaser > /dev/null || go install github.com/goreleaser/goreleaser@latest
+
+release: release_deps
+	goreleaser --clean
+
+.PHONY: test devdeps lint release

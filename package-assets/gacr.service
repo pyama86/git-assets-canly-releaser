@@ -1,0 +1,13 @@
+[Unit]
+Description=Securely release assets on GitHub.
+Documentation=https://github.com/pyama86/github-assets-canary-releases
+After=network.target
+
+[Service]
+Restart=always
+EnvironmentFile=/etc/default/gacr
+ExecStart=/usr/bin/gacr $ARGS
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

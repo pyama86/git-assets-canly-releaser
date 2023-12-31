@@ -1,0 +1,36 @@
+builds:
+  - id: "gacr"
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+    binary: "gacr"
+
+nfpms:
+  -
+    id: gacr-nfpms
+    file_name_template: "{{ .ProjectName }}_{{ .Version }}-1_{{ .Arch }}"
+    builds:
+    - gacr
+    homepage: https://github.com/pyama86/github-assets-canary-releaser
+    maintainer: pyama86 <www.kazu.com@gmail.com>
+    description: Securely release assets on GitHub.
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    contents:
+      - src: ./package-assets/gacr.service
+        dst: /etc/systemd/system/gacr.service
+        type: config
+      - src: ./package-assets/gacr
+        dst: /etc/default/gacr
+        type: config
+    epoch: 1
+release:
+  github:
+    owner: pyama86
+    name: github-assets-canary-releaser
