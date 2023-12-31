@@ -1,4 +1,5 @@
 test:
+	mkdir -p tmp
 	go test ./... -coverprofile=coverage.out -covermode=count
 
 run:
@@ -13,7 +14,8 @@ run:
 		--health-check-interval 2s \
 		--canary-rollout-window 10s \
 		--repository-polling-interval 10s \
-		--save-assets-path ./tmp
+		--save-assets-path ./tmp \
+		--state-file-path ./tmp/state.json
 
 ci: lint test
 

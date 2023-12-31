@@ -29,7 +29,7 @@ import (
 var cfgFile string
 
 var rootCmd = &cobra.Command{
-	Use:   "git-assets-canly-releaser",
+	Use:   "git-assets-canaly-releaser",
 	Short: "This command downloads release assets from GitHub and deploys them.",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -197,7 +197,7 @@ func runServer(config *lib.Config) error {
 					slog.Debug("can't rollout", "err", err)
 				} else {
 					if errors.Is(err, ErrRollback) {
-						slog.Error("rollback success")
+						slog.Info("rollback success")
 					} else {
 						return err
 					}
@@ -233,7 +233,7 @@ func runHealthCheck(config *lib.Config, tag, file string) (string, error) {
 			},
 			retry.Context(cxt),
 			retry.Attempts(config.HealthCheckRetries),
-			retry.Delay(5*time.Second),
+			retry.Delay(config.HealthCheckInterval),
 		)
 		return ret, err
 	}
@@ -365,7 +365,7 @@ func loadConfig() (*lib.Config, error) {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "~/gacr.conf", "config file (default is $HOME/.git-assets-canly-releaser.toml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "~/gacr.conf", "config file (default is $HOME/.git-assets-canaly-releaser.toml)")
 	rootCmd.PersistentFlags().String("repo", "", "GitHub repository name")
 	viper.BindPFlag("repo", rootCmd.PersistentFlags().Lookup("repo"))
 
@@ -432,7 +432,7 @@ func init() {
 	rootCmd.PersistentFlags().Duration("healthcheck-timeout", 30*time.Second, "timeout of health check")
 	viper.BindPFlag("healthcheck_timeout", rootCmd.PersistentFlags().Lookup("healthcheck-timeout"))
 
-	rootCmd.PersistentFlags().String("statefile-path", "/var/lib/gacr/state.json", "state file path")
-	viper.BindPFlag("statefile_path", rootCmd.PersistentFlags().Lookup("statefile-path"))
+	rootCmd.PersistentFlags().String("state-file-path", "/var/lib/gacr/state.json", "state file path")
+	viper.BindPFlag("state_file_path", rootCmd.PersistentFlags().Lookup("state-file-path"))
 
 }
