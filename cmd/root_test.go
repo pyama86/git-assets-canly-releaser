@@ -126,10 +126,14 @@ func TestHandleRollout(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			redisHost := os.Getenv("REDIS_HOST")
+			if redisHost == "" {
+				redisHost = "localhost"
+			}
 			config := &lib.Config{
 				Repo: "foo/bar",
 				Redis: &lib.RedisConfig{
-					Host: "localhost",
+					Host: redisHost,
 					Port: 6379,
 				},
 				DeployCommand: "../testdata/dummy.sh",
@@ -241,10 +245,14 @@ func TestHandleCanaryRollout(t *testing.T) {
 				rollbackCommand = tc.rollbackCommand
 			}
 
+			redisHost := os.Getenv("REDIS_HOST")
+			if redisHost == "" {
+				redisHost = "localhost"
+			}
 			config := &lib.Config{
 				Repo: "foo/bar",
 				Redis: &lib.RedisConfig{
-					Host: "localhost",
+					Host: redisHost,
 					Port: 6379,
 				},
 				DeployCommand:       "../testdata/dummy.sh",
