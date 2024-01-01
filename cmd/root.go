@@ -49,6 +49,11 @@ var rootCmd = &cobra.Command{
 
 		if err := runServer(config); err != nil {
 			slog.Error(fmt.Sprintf("failed to run server: %s", err))
+			// wait for slack notification
+			// https://github.com/samber/slog-slack/blob/main/handler.go#L89
+			if config.SlackWebhookURL != "" {
+				time.Sleep(3 * time.Second)
+			}
 			os.Exit(1)
 		}
 	},
