@@ -311,7 +311,7 @@ func getLogger(config *lib.Config, level string) (*slog.Logger, error) {
 	if config.SlackWebhookURL != "" {
 		logger = slog.New(
 			slogmulti.Fanout(
-				slog.New(slog.NewJSONHandler(logOutput, &ops)).With("host", hostname),
+				slog.NewJSONHandler(logOutput, &ops),
 				slogslack.Option{
 					Level:      logLevel,
 					WebhookURL: config.SlackWebhookURL,
