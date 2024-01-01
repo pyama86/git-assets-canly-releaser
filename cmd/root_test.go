@@ -195,7 +195,7 @@ func TestHandleCanaryRollout(t *testing.T) {
 			name: "Rollback",
 			mockSetup: func(m *MockGitHuber) {
 				m.On("DownloadReleaseAsset", "latest").Return("latest", "assetfile", nil)
-				m.On("DownloadReleaseAsset", "stable").Return("stable", "assetfile", nil)
+				m.On("DownloadReleaseAsset", "rollback").Return("stable", "assetfile", nil)
 			},
 			expectedError: true,
 			before: func(redisClient *redis.Client) {

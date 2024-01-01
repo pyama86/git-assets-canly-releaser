@@ -116,7 +116,7 @@ func (s *State) CanInstallTag(tag string) error {
 		return errors.New("tag is empty")
 	}
 
-	lastInstalledTag, err := s.getLastInstalledTag()
+	lastInstalledTag, err := s.GetLastInstalledTag()
 	if err != nil {
 		return err
 	}
@@ -142,7 +142,7 @@ func (s *State) CanInstallTag(tag string) error {
 	return nil
 }
 
-func (s *State) getLastInstalledTag() (string, error) {
+func (s *State) GetLastInstalledTag() (string, error) {
 	out, err := exec.Command(s.config.VersionCommand).Output()
 	if err != nil {
 		return "", err
@@ -150,19 +150,17 @@ func (s *State) getLastInstalledTag() (string, error) {
 	return strings.TrimRight(strings.TrimSpace(string(out)), "\n"), nil
 }
 
-func (s *State) RollbackTag() (string, error) {
-	stableRelease, err := s.CurrentStableTag()
-	if err != nil {
-		return "", err
-	}
-
-	rollbackTag := stableRelease
-	if rollbackTag == "" {
-		rollbackTag, err = s.getLastInstalledTag()
+func (s *State) RollbackTag(beforeInstall string) (string, error) {
+	rollbackTag := beforeInstall
+	if beforeInstall == "" {
+		stableRelease, err := s.CurrentStableTag()
 		if err != nil {
 			return "", err
 		}
+
+		rollbackTag = stableRelease
 	}
+
 	if rollbackTag == "" {
 		return "", fmt.Errorf("can't decided rollback tag")
 	}

@@ -122,6 +122,11 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 		return nil
 	}
 
+	lastInstalledTag, err := state.GetLastInstalledTag()
+	if err != nil {
+		return err
+	}
+
 	if err := lockAndRoll(latestTag, config.DeployCommand, github, state, state.TryCanaryReleaseLock, func(tag, filename string, err error) error {
 		if err != nil {
 			return err
@@ -134,7 +139,7 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 				}
 
 				// try rollback
-				rollbackTag, err := state.RollbackTag()
+				rollbackTag, err := state.RollbackTag(lastInstalledTag)
 				if err != nil {
 					return err
 				}
