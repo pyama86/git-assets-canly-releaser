@@ -72,20 +72,13 @@ func deploy(cmd, tag string, github lib.GitHuber) (string, string, error) {
 	return tag, downloadFile, nil
 }
 
-func lockAndRoll(tag, cmd string, github lib.GitHuber, state *lib.State, afterDeploy func(string, string, error) error) error {
+func lockAndRoll(tag, cmd string, github lib.GitHuber, state *lib.State, lockFunc func(string) (bool, error), afterDeploy func(string, string, error) error) error {
 	err := state.CanInstallTag(tag)
 	if err != nil {
 		return err
 	}
 
-	got := false
-
-	if tag == lib.LatestTag {
-		got, err = state.TryCanaryReleaseLock(tag)
-	} else {
-		got, err = state.TryRolloutLock(tag)
-	}
-
+	got, err := lockFunc(tag)
 	if err != nil {
 		return err
 	}
@@ -110,7 +103,7 @@ func handleRollout(config *lib.Config, github lib.GitHuber, state *lib.State) er
 	if stableRelease == "" {
 		return nil
 	}
-	return lockAndRoll(stableRelease, config.DeployCommand, github, state, nil)
+	return lockAndRoll(stableRelease, config.DeployCommand, github, state, state.TryRolloutLock, nil)
 }
 
 func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.State) error {
@@ -128,7 +121,7 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 		return nil
 	}
 
-	if err := lockAndRoll(lib.LatestTag, config.DeployCommand, github, state, func(tag, filename string, err error) error {
+	if err := lockAndRoll(latestTag, config.DeployCommand, github, state, state.TryCanaryReleaseLock, func(tag, filename string, err error) error {
 		if err != nil {
 			return err
 		} else {
