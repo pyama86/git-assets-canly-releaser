@@ -182,7 +182,7 @@ func TestHandleCanaryRollout(t *testing.T) {
 			},
 			expectedError: false,
 			before: func(redisClient *redis.Client, statefile string) {
-				redisClient.Set(context.Background(), "foo/bar_stable_release_tag", "latest", 0)
+				redisClient.Set(context.Background(), "foo/bar_stable_release_tag", "stable", 0)
 				redisClient.Del(context.Background(), "foo/bar_avoid_release_tag")
 			},
 		},
@@ -193,7 +193,7 @@ func TestHandleCanaryRollout(t *testing.T) {
 			},
 			expectedError: true,
 			before: func(redisClient *redis.Client, statefile string) {
-				redisClient.Set(context.Background(), "foo/bar_stable_release_tag", "latest", 0)
+				redisClient.Set(context.Background(), "foo/bar_stable_release_tag", "nomatch", 0)
 				redisClient.Del(context.Background(), "foo/bar_avoid_release_tag")
 
 				f, err := os.Create(statefile)

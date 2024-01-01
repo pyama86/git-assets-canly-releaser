@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -131,6 +132,7 @@ func (s *State) CanInstallTag(tag string) error {
 	if tag == "" {
 		return errors.New("tag is empty")
 	}
+
 	lastInstalledTag, err := s.getLastInstalledTag()
 	if err != nil {
 		return err
@@ -138,6 +140,8 @@ func (s *State) CanInstallTag(tag string) error {
 	if lastInstalledTag == "" {
 		return nil
 	}
+
+	slog.Debug("tags", "lastInstalledTag", lastInstalledTag, "tag", tag)
 	if lastInstalledTag == tag {
 		return ErrAlreadyInstalled
 	}

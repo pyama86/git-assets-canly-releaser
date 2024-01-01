@@ -107,6 +107,19 @@ func handleRollout(config *lib.Config, github lib.GitHuber, state *lib.State) er
 }
 
 func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.State) error {
+	latestTag, _, err := github.DownloadReleaseAsset(lib.LatestTag)
+	if err != nil {
+		return err
+	}
+
+	stableRelease, err := state.CurrentStableTag()
+	if err != nil {
+		return err
+	}
+	if latestTag == stableRelease {
+		return nil
+	}
+
 	if err := lockAndRoll(lib.LatestTag, config.DeployCommand, github, state, func(tag, filename string, err error) error {
 		if err != nil {
 			return err
