@@ -27,7 +27,7 @@ jobs:
 
     - name: Build
       run: |
-        git config --global --add safe.directory /__w/git-assets-canaly-releaser/git-assets-canaly-releaser
+        git config --global --add safe.directory /__w/git-assets-canary-releaser/git-assets-canary-releaser
         go build -v ./...
 
     - name: Test
