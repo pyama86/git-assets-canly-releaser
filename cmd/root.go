@@ -92,7 +92,7 @@ func lockAndRoll(tag, cmd string, github lib.GitHuber, state *lib.State, afterDe
 	if got {
 		if tag, file, err := deploy(cmd, tag, github); err != nil {
 			return fmt.Errorf("deploy command failed: %s", err)
-		} else {
+		} else if afterDeploy != nil {
 			if err := afterDeploy(tag, file, err); err != nil {
 				return err
 			}
@@ -107,14 +107,10 @@ func handleRollout(config *lib.Config, github lib.GitHuber, state *lib.State) er
 		return err
 	}
 
-	return lockAndRoll(stableRelease, config.DeployCommand, github, state, func(tag, filename string, err error) error {
-		if err == nil {
-			if err := state.SaveLastInstalledTag(stableRelease); err != nil {
-				return err
-			}
-		}
-		return err
-	})
+	if stableRelease == "" {
+		return nil
+	}
+	return lockAndRoll(stableRelease, config.DeployCommand, github, state, nil)
 }
 
 func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.State) error {
@@ -152,10 +148,6 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 			} else {
 				if err := state.SaveStableReleaseTag(tag); err != nil {
 					return fmt.Errorf("can't save stable tag:%s", err)
-				}
-
-				if err := state.SaveLastInstalledTag(tag); err != nil {
-					return fmt.Errorf("can't save last installed tag:%s", err)
 				}
 
 				slog.Info("canary release success", "tag", tag)
@@ -311,7 +303,7 @@ func executeCommand(command string, tag, file string, timeout time.Duration) ([]
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 
 	slog.Debug("command result", "command", command, "out", string(out))
@@ -411,7 +403,8 @@ func loadConfig() (*lib.Config, error) {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "~/gacr.conf", "config file (default is $HOME/.git-assets-canaly-releaser.toml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "~/gacr.conf", "config file (default is $HOME/gacr.conf)")
+
 	rootCmd.PersistentFlags().String("repo", "", "GitHub repository name")
 	viper.BindPFlag("repo", rootCmd.PersistentFlags().Lookup("repo"))
 
@@ -480,8 +473,4 @@ func init() {
 
 	rootCmd.PersistentFlags().Duration("healthcheck-timeout", 30*time.Second, "timeout of health check")
 	viper.BindPFlag("healthcheck_timeout", rootCmd.PersistentFlags().Lookup("healthcheck-timeout"))
-
-	rootCmd.PersistentFlags().String("state-file-path", "/var/lib/gacr/state.json", "state file path")
-	viper.BindPFlag("state_file_path", rootCmd.PersistentFlags().Lookup("state-file-path"))
-
 }

@@ -17,7 +17,7 @@ type Config struct {
 	DeployCommand            string        `mapstructure:"deploy_command"  validate:"required"`
 	RollbackCommand          string        `mapstructure:"rollback_command"`
 	HealthCheckCommand       string        `mapstructure:"healthcheck_command" validate:"required"`
-	VersionCommand           string        `mapstructure:"version_command"`
+	VersionCommand           string        `mapstructure:"version_command" validate:"required"`
 	HealthCheckInterval      time.Duration `mapstructure:"healthcheck_interval" validate:"required"`
 	CanaryRolloutWindow      time.Duration `mapstructure:"canary_rollout_window" validate:"required"`
 	RolloutWindow            time.Duration `mapstructure:"rollout_window" validate:"required"`
@@ -29,5 +29,4 @@ type Config struct {
 	LogLevel                 string        `mapstructure:"log_level"`
 	HealthCheckRetries       uint          `mapstructure:"healthcheck_retries" validate:"required"`
 	HealthCheckTimeout       time.Duration `mapstructure:"healthcheck_timeout" validate:"required"`
-	StateFilePath            string        `mapstructure:"state_file_path" validate:"required"`
 }

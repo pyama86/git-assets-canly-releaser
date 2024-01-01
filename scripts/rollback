@@ -1,2 +1,0 @@
-#!/bin/bash
-echo "rollback release_tag:$RELEASE_TAG file:$ASSET_FILE"

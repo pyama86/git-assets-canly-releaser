@@ -2,11 +2,9 @@ package lib
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -21,10 +19,6 @@ type State struct {
 	avoidReleaseTagKey  string
 	rolloutKey          string
 	config              *Config
-
-	// localstate
-	LastInstalledTag string `json:"last_installed_tag"`
-	stateFilePath    string
 }
 
 func NewState(config *Config) (*State, error) {
@@ -44,7 +38,6 @@ func NewState(config *Config) (*State, error) {
 		stableReleaseTagKey: fmt.Sprintf("%s_stable_release_tag", config.Repo),
 		avoidReleaseTagKey:  fmt.Sprintf("%s_avoid_release_tag", config.Repo),
 		rolloutKey:          fmt.Sprintf("%s_rollout", config.Repo),
-		stateFilePath:       config.StateFilePath,
 	}, nil
 }
 
@@ -116,11 +109,6 @@ func (s *State) getReleases(key string) ([]string, error) {
 	return s.client.SMembers(context.Background(), key).Result()
 }
 
-func (s *State) SaveLastInstalledTag(tag string) error {
-	s.LastInstalledTag = tag
-	return s.saveLocalState()
-}
-
 var ErrAlreadyInstalled = errors.New("already installed")
 
 func (s *State) CanInstallTag(tag string) error {
@@ -155,54 +143,11 @@ func (s *State) CanInstallTag(tag string) error {
 }
 
 func (s *State) getLastInstalledTag() (string, error) {
-	if s.config.VersionCommand != "" {
-		out, err := exec.Command(s.config.VersionCommand).Output()
-		if err != nil {
-			return "", err
-		}
-		return strings.TrimRight(strings.TrimSpace(string(out)), "\n"), nil
-	}
-	if err := s.readLocalState(); err != nil {
+	out, err := exec.Command(s.config.VersionCommand).Output()
+	if err != nil {
 		return "", err
 	}
-	return s.LastInstalledTag, nil
-}
-
-func (s *State) saveLocalState() error {
-	dir := s.stateFilePath[:len(s.stateFilePath)-len(s.stateFilePath[strings.LastIndex(s.stateFilePath, "/"):])]
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return err
-	}
-
-	f, err := os.OpenFile(s.stateFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return err
-	}
-
-	defer f.Close()
-	return json.NewEncoder(f).Encode(s)
-
-}
-
-func (s *State) readLocalState() error {
-	if _, err := os.Stat(s.stateFilePath); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return err
-	}
-
-	f, err := os.Open(s.stateFilePath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	err = json.NewDecoder(f).Decode(s)
-	if err != nil {
-		return err
-	}
-	return nil
+	return strings.TrimRight(strings.TrimSpace(string(out)), "\n"), nil
 }
 
 func (s *State) RollbackTag() (string, error) {
@@ -213,7 +158,10 @@ func (s *State) RollbackTag() (string, error) {
 
 	rollbackTag := stableRelease
 	if rollbackTag == "" {
-		rollbackTag = s.LastInstalledTag
+		rollbackTag, err = s.getLastInstalledTag()
+		if err != nil {
+			return "", err
+		}
 	}
 	if rollbackTag == "" {
 		return "", fmt.Errorf("can't decided rollback tag")

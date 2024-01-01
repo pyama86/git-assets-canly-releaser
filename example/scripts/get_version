@@ -1,0 +1,3 @@
+#!/bin/bash
+set -e
+echo v`dpkg-query -l stns-v2 |grep -oP '(\d+\.\d+\.\d+)'`
