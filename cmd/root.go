@@ -116,6 +116,7 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 	if err != nil {
 		return err
 	}
+
 	if latestTag == stableRelease {
 		return nil
 	}
@@ -142,12 +143,15 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 					return fmt.Errorf("can't save stable tag:%s", err)
 				}
 
-				if err := state.UnlockCanaryRelease(); err != nil {
-					return fmt.Errorf("can't unlock canary release tag")
+				if err := state.SaveLastInstalledTag(tag); err != nil {
+					return fmt.Errorf("can't save last installed tag:%s", err)
 				}
 
 				slog.Info("canary release success", "tag", tag)
-				return state.SaveLastInstalledTag(tag)
+				if err := state.UnlockCanaryRelease(); err != nil {
+					return fmt.Errorf("can't unlock canary release tag")
+				}
+				return nil
 			}
 		}
 	}); err != nil {
