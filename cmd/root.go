@@ -248,7 +248,10 @@ func runHealthCheck(config *lib.Config, tag, file string) (string, error) {
 
 	f := func() (string, error) {
 		ret := ""
-		cxt, cancel := context.WithTimeout(context.Background(), config.HealthCheckTimeout)
+		cxt, cancel := context.WithTimeout(
+			context.Background(),
+			config.HealthCheckTimeout*time.Duration(config.HealthCheckRetries)+
+				config.HealthCheckInterval*time.Duration(config.HealthCheckRetries))
 		defer cancel()
 		err := retry.Do(
 			func() error {
@@ -258,7 +261,6 @@ func runHealthCheck(config *lib.Config, tag, file string) (string, error) {
 					return fmt.Errorf("health check command failed: %s, %s", err.Error(), string(out))
 				}
 				return nil
-
 			},
 			retry.Context(cxt),
 			retry.Attempts(config.HealthCheckRetries),
@@ -268,7 +270,6 @@ func runHealthCheck(config *lib.Config, tag, file string) (string, error) {
 	}
 	slog.Info("start health check", "tag", tag, "file", file)
 	if out, err := f(); err != nil {
-		slog.Error("health check failed", "tag", tag, "file", file, "err", err, "out", out)
 		return out, err
 	}
 
