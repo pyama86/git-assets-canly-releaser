@@ -4,10 +4,12 @@ Documentation=https://github.com/pyama86/github-assets-canary-releases
 After=network.target
 
 [Service]
-Restart=always
+Restart=on-failure
 EnvironmentFile=/etc/default/gacr
 ExecStart=/usr/bin/gacr $ARGS
-Restart=always
+StartLimitInterval=60
+StartLimitBurst=2
+StartLimitInterval=300
 
 [Install]
 WantedBy=multi-user.target
