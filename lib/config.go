@@ -15,7 +15,7 @@ type Config struct {
 	SaveAssetsPath           string        `mapstructure:"save_assets_path" validate:"required"`
 	GitHubAPIEndpoint        string        `mapstructure:"github_api"`
 	DeployCommand            string        `mapstructure:"deploy_command"  validate:"required"`
-	RollbackCommand          string        `mapstructure:"rollback_command" validate:"required"`
+	RollbackCommand          string        `mapstructure:"rollback_command"`
 	HealthCheckCommand       string        `mapstructure:"healthcheck_command" validate:"required"`
 	CurrentVersionCommand    string        `mapstructure:"current_version_command" validate:"required"`
 	HealthCheckInterval      time.Duration `mapstructure:"healthcheck_interval" validate:"required"`

@@ -172,8 +172,12 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 }
 
 var ErrRollback = errors.New("rollback")
+var ErrNoRollback = errors.New("no rollback")
 
 func handleRollback(rollbackTag string, config *lib.Config, github lib.GitHuber) error {
+	if config.RollbackCommand == "" {
+		return ErrNoRollback
+	}
 	slog.Info("start rollback", "tag", rollbackTag)
 	if _, _, err := deploy(config.RollbackCommand, rollbackTag, github); err != nil {
 		return fmt.Errorf("rollback error: %s", err)
@@ -227,6 +231,8 @@ func runServer(config *lib.Config) error {
 				} else {
 					if errors.Is(err, ErrRollback) {
 						slog.Info("rollback success")
+					} else if errors.Is(err, ErrNoRollback) {
+						slog.Info("no rollback because no rollback command")
 					} else {
 						return err
 					}
