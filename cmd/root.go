@@ -91,6 +91,7 @@ func lockAndRoll(tag, cmd string, github lib.GitHuber, state *lib.State, lockFun
 				return err
 			}
 		}
+		slog.Info("deploy command success", "tag", tag, "cmd", cmd)
 	}
 	return nil
 }
