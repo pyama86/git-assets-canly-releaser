@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -154,6 +155,13 @@ func (s *State) CanInstallTag(tag string) error {
 }
 
 func (s *State) getLastInstalledTag() (string, error) {
+	if s.config.CurrentVersionCommand != "" {
+		out, err := exec.Command(s.config.CurrentVersionCommand).Output()
+		if err != nil {
+			return "", err
+		}
+		return strings.TrimRight(strings.TrimSpace(string(out)), "\n"), nil
+	}
 	if err := s.readLocalState(); err != nil {
 		return "", err
 	}

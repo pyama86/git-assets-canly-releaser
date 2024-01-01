@@ -65,7 +65,7 @@ func deploy(cmd, tag string, github lib.GitHuber) (string, string, error) {
 		return "", "", fmt.Errorf("can't get release asset:%s %s", tag, err)
 	}
 
-	out, err := executeCommand(cmd, tag, downloadFile)
+	out, err := executeCommand(cmd, tag, downloadFile, 5*time.Minute)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to execute command: %s, %s", err, out)
 	}
@@ -255,7 +255,7 @@ func runHealthCheck(config *lib.Config, tag, file string) (string, error) {
 		defer cancel()
 		err := retry.Do(
 			func() error {
-				out, err := executeCommand(config.HealthCheckCommand, tag, file)
+				out, err := executeCommand(config.HealthCheckCommand, tag, file, config.HealthCheckTimeout)
 				ret = string(out)
 				if err != nil {
 					return fmt.Errorf("health check command failed: %s, %s", err.Error(), string(out))
@@ -286,13 +286,20 @@ func runHealthCheck(config *lib.Config, tag, file string) (string, error) {
 	}
 }
 
-func executeCommand(command string, tag, file string) ([]byte, error) {
+func executeCommand(command string, tag, file string, timeout time.Duration) ([]byte, error) {
 	p, err := filepath.Abs(command)
 	if err != nil {
 		return nil, err
 	}
 
-	cmd := exec.Command(p)
+	ctx := context.Background()
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+	}
+
+	cmd := exec.CommandContext(ctx, p)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("RELEASE_TAG=%s", tag))
 	cmd.Env = append(cmd.Env, fmt.Sprintf("ASSET_FILE=%s", file))
 
