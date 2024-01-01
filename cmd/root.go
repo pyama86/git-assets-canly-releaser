@@ -20,6 +20,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pyama86/git-assets-canaly-releaser/lib"
+	slogmulti "github.com/samber/slog-multi"
 	slogslack "github.com/samber/slog-slack/v2"
 
 	"github.com/spf13/cobra"
@@ -309,11 +310,14 @@ func getLogger(config *lib.Config, level string) (*slog.Logger, error) {
 	logger := slog.New(slog.NewJSONHandler(logOutput, &ops)).With("host", hostname)
 	if config.SlackWebhookURL != "" {
 		logger = slog.New(
-			slogslack.Option{
-				Level:      logLevel,
-				WebhookURL: config.SlackWebhookURL,
-				Channel:    config.SlackChannel,
-			}.NewSlackHandler(),
+			slogmulti.Fanout(
+				slog.New(slog.NewJSONHandler(logOutput, &ops)).With("host", hostname),
+				slogslack.Option{
+					Level:      logLevel,
+					WebhookURL: config.SlackWebhookURL,
+					Channel:    config.SlackChannel,
+				}.NewSlackHandler(),
+			),
 		).With("host", hostname)
 	}
 
