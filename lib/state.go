@@ -13,12 +13,6 @@ import (
 	redis "github.com/redis/go-redis/v9"
 )
 
-type Stater interface {
-	CurrentStableTag() (string, error)
-	CanInstallTag(tag string) error
-	TryRolloutLock(tag string) (bool, error)
-}
-
 type State struct {
 	client              *redis.Client
 	canaryReleaseTagKey string

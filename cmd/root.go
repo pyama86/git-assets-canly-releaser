@@ -78,11 +78,17 @@ func lockAndRoll(tag, cmd string, github lib.GitHuber, state *lib.State, afterDe
 		return err
 	}
 
-	got, err := state.TryRolloutLock(tag)
+	got := false
+
+	if tag == lib.LatestTag {
+		got, err = state.TryCanaryReleaseLock(tag)
+	} else {
+		got, err = state.TryRolloutLock(tag)
+	}
+
 	if err != nil {
 		return err
 	}
-
 	if got {
 		if tag, file, err := deploy(cmd, tag, github); err != nil {
 			return fmt.Errorf("deploy command failed: %s", err)
