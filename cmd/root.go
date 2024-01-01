@@ -447,7 +447,7 @@ func init() {
 	rootCmd.PersistentFlags().String("save-assets-path", "/usr/local/src", "assets download path")
 	viper.BindPFlag("save_assets_path", rootCmd.PersistentFlags().Lookup("save-assets-path"))
 
-	rootCmd.PersistentFlags().Duration("canary-rollout-window", 15*time.Minute, "canary release rollout window")
+	rootCmd.PersistentFlags().Duration("canary-rollout-window", 5*time.Minute, "canary release rollout window")
 	viper.BindPFlag("canary_rollout_window", rootCmd.PersistentFlags().Lookup("canary-rollout-window"))
 
 	rootCmd.PersistentFlags().Duration("rollout-window", 1*time.Minute, "release rollout window")
@@ -456,7 +456,7 @@ func init() {
 	rootCmd.PersistentFlags().Duration("health-check-interval", 1*time.Minute, "health check interval")
 	viper.BindPFlag("healthcheck_interval", rootCmd.PersistentFlags().Lookup("health-check-interval"))
 
-	rootCmd.PersistentFlags().Duration("repository-polling-interval", 1*time.Minute, "repository polling interval")
+	rootCmd.PersistentFlags().Duration("repository-polling-interval", 5*time.Minute, "repository polling interval")
 	viper.BindPFlag("repository_polling_interval", rootCmd.PersistentFlags().Lookup("repository-polling-interval"))
 
 	rootCmd.PersistentFlags().Bool("once", false, "one shot mode")
