@@ -41,4 +41,13 @@ Here's an example of how to use command-line flags (note: not all options are co
   --deploy-command "/path/to/your/deploy/script" \
   --rollback-command "/path/to/your/rollback/script" \
   --healthcheck-command "/path/to/your/health/check/script"
+  --version-command "/path/to/your/version/script"
+```
+
+## example
+
+The example of using docker-compose can be checked with the following command:
+
+```bash
+$ make run_example
 ```
