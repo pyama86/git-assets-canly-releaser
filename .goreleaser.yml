@@ -14,7 +14,7 @@ nfpms:
     file_name_template: "{{ .ProjectName }}_{{ .Version }}-1_{{ .Arch }}"
     builds:
     - gacr
-    homepage: https://github.com/pyama86/github-assets-canary-releaser
+    homepage: https://github.com/pyama86/git-assets-canary-releaser
     maintainer: pyama86 <www.kazu.com@gmail.com>
     description: Securely release assets on GitHub.
     license: MIT
@@ -33,4 +33,4 @@ nfpms:
 release:
   github:
     owner: pyama86
-    name: github-assets-canary-releaser
+    name: git-assets-canary-releaser
