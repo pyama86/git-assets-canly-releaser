@@ -9,8 +9,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GOPATH: /home/github/src
-      HOME: /home/github
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
