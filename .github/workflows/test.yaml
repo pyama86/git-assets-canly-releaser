@@ -20,6 +20,8 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+        ports:
+          - 6379:6379
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -31,4 +33,4 @@ jobs:
     - name: Test
       run: make ci
       env:
-        GACR_REDIS_HOST: redis
+        GACR_REDIS_HOST: 127.0.0.1
