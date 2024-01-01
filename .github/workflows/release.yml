@@ -6,7 +6,7 @@ on:
 name: Release
 jobs:
   build:
-    runs-on: normal
+    runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GOPATH: /home/github/src
