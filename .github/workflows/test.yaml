@@ -12,7 +12,6 @@ on:
 
 jobs:
   build:
-    container: golang:latest
     services:
       redis:
         image: redis
@@ -23,13 +22,12 @@ jobs:
           --health-retries 5
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-
-    - name: Build
-      run: |
-        git config --global --add safe.directory /__w/git-assets-canary-releaser/git-assets-canary-releaser
-        go build -v ./...
-
+    - uses: actions/checkout@v4
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+        cache: true
     - name: Test
       run: make ci
       env:
