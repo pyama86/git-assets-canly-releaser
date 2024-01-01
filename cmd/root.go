@@ -83,6 +83,7 @@ func lockAndRoll(tag, cmd string, github lib.GitHuber, state *lib.State, lockFun
 		return err
 	}
 	if got {
+		slog.Info("lock success and start deploy", "tag", tag, "cmd", cmd)
 		if tag, file, err := deploy(cmd, tag, github); err != nil {
 			return fmt.Errorf("deploy command failed: %s", err)
 		} else if afterDeploy != nil {
@@ -125,7 +126,7 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 		if err != nil {
 			return err
 		} else {
-			slog.Info("deploy command success", "tag", tag)
+			slog.Info("deploy command success and start health check", "tag", tag, "cmd", config.HealthCheckCommand)
 			if out, err := runHealthCheck(config, tag, filename); err != nil {
 				slog.Error("health check command failed", slog.String("err", err.Error()), slog.String("out", out))
 				if err := state.SaveAvoidReleaseTag(tag); err != nil {
@@ -139,6 +140,7 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 				}
 				return handleRollback(rollbackTag, config, github)
 			} else {
+				slog.Info("health check command success", slog.String("out", out))
 				if err := state.SaveStableReleaseTag(tag); err != nil {
 					return fmt.Errorf("can't save stable tag:%s", err)
 				}
@@ -259,7 +261,6 @@ func runHealthCheck(config *lib.Config, tag, file string) (string, error) {
 		)
 		return ret, err
 	}
-	slog.Info("start health check", "tag", tag, "file", file)
 	if out, err := f(); err != nil {
 		return out, err
 	}
