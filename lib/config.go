@@ -17,7 +17,7 @@ type Config struct {
 	DeployCommand            string        `mapstructure:"deploy_command"  validate:"required"`
 	RollbackCommand          string        `mapstructure:"rollback_command"`
 	HealthCheckCommand       string        `mapstructure:"healthcheck_command" validate:"required"`
-	CurrentVersionCommand    string        `mapstructure:"current_version_command" validate:"required"`
+	VersionCommand           string        `mapstructure:"version_command"`
 	HealthCheckInterval      time.Duration `mapstructure:"healthcheck_interval" validate:"required"`
 	CanaryRolloutWindow      time.Duration `mapstructure:"canary_rollout_window" validate:"required"`
 	RolloutWindow            time.Duration `mapstructure:"rollout_window" validate:"required"`

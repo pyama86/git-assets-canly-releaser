@@ -430,6 +430,9 @@ func init() {
 	rootCmd.PersistentFlags().String("healthcheck-command", "", "HealthCheck command")
 	viper.BindPFlag("healthcheck_command", rootCmd.PersistentFlags().Lookup("healthcheck-command"))
 
+	rootCmd.PersistentFlags().String("version-command", "", "Version command")
+	viper.BindPFlag("version_command", rootCmd.PersistentFlags().Lookup("version-command"))
+
 	rootCmd.PersistentFlags().String("slack-webhook-url", "", "Slack webhook URL")
 	viper.BindPFlag("slack_webhook_url", rootCmd.PersistentFlags().Lookup("slack-webhook-url"))
 

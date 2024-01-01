@@ -19,7 +19,6 @@ run:
 
 ci: lint test
 
-
 lint: devdeps
 	@staticcheck ./...
 	go vet ./...
@@ -32,5 +31,8 @@ release_deps:
 
 release: release_deps
 	goreleaser --clean
+
+build:
+	go build -o dist/gacr main.go
 
 .PHONY: test devdeps lint release

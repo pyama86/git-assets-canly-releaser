@@ -155,8 +155,8 @@ func (s *State) CanInstallTag(tag string) error {
 }
 
 func (s *State) getLastInstalledTag() (string, error) {
-	if s.config.CurrentVersionCommand != "" {
-		out, err := exec.Command(s.config.CurrentVersionCommand).Output()
+	if s.config.VersionCommand != "" {
+		out, err := exec.Command(s.config.VersionCommand).Output()
 		if err != nil {
 			return "", err
 		}
