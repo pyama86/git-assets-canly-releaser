@@ -2,6 +2,16 @@
 ## Overview
 The git-assets-canaly-releaser is a tool designed to automate the deployment of the latest release assets from GitHub repositories. It facilitates a Canary release strategy where new software versions are rolled out incrementally to a subset of users before making it available to everyone. This helps in detecting and addressing any potential issues early in the release process.
 
+```mermaid
+graph TD
+    A[Download Assets from GitHub] --> B[Canary Release]
+    B --> C[Perform Health Check]
+    C -->|Health Check OK| D[Full Release]
+    C -->|Health Check Fail| E[Rollback]
+    D --> F[Deployment Complete]
+    E --> G[Deployment Rollback]
+```
+
 ## Features
 - Automatically downloads and deploys latest release assets from GitHub.
 - Implements Canary Release strategy with health checks and rollback functionality.
