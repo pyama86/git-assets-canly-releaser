@@ -78,6 +78,8 @@ func TestDeploy(t *testing.T) {
 			}
 
 			state, err := lib.NewState(config)
+			assert.NoError(t, err)
+
 			tag, file, err := deploy(tt.cmd, tt.tag, state, mockGitHub)
 
 			if tt.wantErr {
