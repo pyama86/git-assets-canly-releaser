@@ -124,8 +124,9 @@ func (s *State) CanInstallTag(tag string) error {
 	if err != nil {
 		return err
 	}
+
 	if lastInstalledTag == "" {
-		return nil
+		return fmt.Errorf("last installed tag is empty")
 	}
 
 	slog.Debug("tags", "lastInstalledTag", lastInstalledTag, "tag", tag)
