@@ -59,11 +59,18 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func deploy(cmd, tag string, github lib.GitHuber) (string, string, error) {
+func deploy(cmd, tag string, state *lib.State, github lib.GitHuber) (string, string, error) {
 	tag, downloadFile, err := github.DownloadReleaseAsset(tag)
 	if err != nil {
 		return "", "", fmt.Errorf("can't get release asset:%s %s", tag, err)
 	}
+
+	currentVersion, err := state.GetLastInstalledTag()
+	if err != nil {
+		return "", "", fmt.Errorf("can't get current version:%s", err)
+	}
+
+	slog.Info("deploy version info", slog.String("current_version", currentVersion), slog.String("new_version", tag))
 
 	out, err := executeCommand(cmd, tag, downloadFile, 5*time.Minute)
 	if err != nil {
@@ -94,7 +101,7 @@ func lockAndRoll(tag, cmd string, github lib.GitHuber, state *lib.State, canaryR
 		} else {
 			slog.Info("lock success and start rollout", "tag", tag, "cmd", cmd)
 		}
-		if tag, file, err := deploy(cmd, tag, github); err != nil {
+		if tag, file, err := deploy(cmd, tag, state, github); err != nil {
 			return fmt.Errorf("deploy command failed: %s", err)
 		} else if afterDeploy != nil {
 			if err := afterDeploy(tag, file, err); err != nil {
@@ -158,7 +165,7 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 				if err != nil {
 					return err
 				}
-				return handleRollback(rollbackTag, config, github)
+				return handleRollback(rollbackTag, config, state, github)
 			} else {
 				slog.Info("health check success", "tag", tag)
 				if err := state.SaveStableReleaseTag(tag); err != nil {
@@ -180,12 +187,12 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 var ErrRollback = errors.New("rollback")
 var ErrNoRollback = errors.New("no rollback")
 
-func handleRollback(rollbackTag string, config *lib.Config, github lib.GitHuber) error {
+func handleRollback(rollbackTag string, config *lib.Config, state *lib.State, github lib.GitHuber) error {
 	if config.RollbackCommand == "" {
 		return ErrNoRollback
 	}
 	slog.Info("start rollback", "tag", rollbackTag)
-	if _, _, err := deploy(config.RollbackCommand, rollbackTag, github); err != nil {
+	if _, _, err := deploy(config.RollbackCommand, rollbackTag, state, github); err != nil {
 		return fmt.Errorf("rollback error: %s", err)
 	}
 	slog.Info("rollback success", "tag", rollbackTag)

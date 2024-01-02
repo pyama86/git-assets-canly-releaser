@@ -62,8 +62,23 @@ func TestDeploy(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockGitHub := new(MockGitHuber)
 			tt.mockSetup(mockGitHub)
+			redisHost := os.Getenv("GACR_REDIS_HOST")
+			if redisHost == "" {
+				redisHost = "localhost"
+			}
 
-			tag, file, err := deploy(tt.cmd, tt.tag, mockGitHub)
+			config := &lib.Config{
+				Repo: "foo/bar",
+				Redis: &lib.RedisConfig{
+					Host: redisHost,
+					Port: 6379,
+				},
+				DeployCommand:  "../testdata/dummy.sh",
+				VersionCommand: "../testdata/echo_version.sh",
+			}
+
+			state, err := lib.NewState(config)
+			tag, file, err := deploy(tt.cmd, tt.tag, state, mockGitHub)
 
 			if tt.wantErr {
 				assert.Error(t, err)

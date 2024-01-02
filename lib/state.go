@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os/exec"
 	"strings"
 	"time"
@@ -129,7 +128,6 @@ func (s *State) CanInstallTag(tag string) error {
 		return fmt.Errorf("last installed tag is empty")
 	}
 
-	slog.Debug("tags", "lastInstalledTag", lastInstalledTag, "tag", tag)
 	if lastInstalledTag == tag {
 		return ErrAlreadyInstalled
 	}
