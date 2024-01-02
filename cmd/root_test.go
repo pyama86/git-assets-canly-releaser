@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pyama86/git-assets-canaly-releaser/lib"
-	"github.com/pyama86/git-assets-canaly-releaser/testutils"
+	"github.com/pyama86/git-assets-canary-releaser/lib"
+	"github.com/pyama86/git-assets-canary-releaser/testutils"
 	redis "github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/mock"
 	"github.com/tj/assert"

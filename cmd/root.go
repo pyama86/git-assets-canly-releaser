@@ -19,7 +19,7 @@ import (
 	"github.com/avast/retry-go"
 	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/go-homedir"
-	"github.com/pyama86/git-assets-canaly-releaser/lib"
+	"github.com/pyama86/git-assets-canary-releaser/lib"
 	slogmulti "github.com/samber/slog-multi"
 	slogslack "github.com/samber/slog-slack/v2"
 
@@ -30,7 +30,7 @@ import (
 var cfgFile string
 
 var rootCmd = &cobra.Command{
-	Use:   "git-assets-canaly-releaser",
+	Use:   "git-assets-canary-releaser",
 	Short: "This command downloads release assets from GitHub and deploys them.",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {

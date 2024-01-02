@@ -1,6 +1,6 @@
-# README for git-assets-canaly-releaser
+# README for git-assets-canary-releaser
 ## Overview
-The git-assets-canaly-releaser is a tool designed to automate the deployment of the latest release assets from GitHub repositories. It facilitates a Canary release strategy where new software versions are rolled out incrementally to a subset of users before making it available to everyone. This helps in detecting and addressing any potential issues early in the release process.
+The git-assets-canary-releaser is a tool designed to automate the deployment of the latest release assets from GitHub repositories. It facilitates a Canary release strategy where new software versions are rolled out incrementally to a subset of users before making it available to everyone. This helps in detecting and addressing any potential issues early in the release process.
 
 ```mermaid
 graph TD
@@ -40,12 +40,12 @@ Configuration can be done via command-line flags or a TOML configuration file. Y
 After building the tool, you can run it with the appropriate flags or configuration file. If you're using a configuration file, it might look like this:
 
 ```sh
-./git-assets-canaly-releaser --config path/to/your/config.toml
+./git-assets-canary-releaser --config path/to/your/config.toml
 ```
 
 Here's an example of how to use command-line flags (note: not all options are covered):
 ```sh
-./git-assets-canaly-releaser \
+./git-assets-canary-releaser \
   --repo "your-github-repo/name" \
   --github-token "your_github_token" \
   --deploy-command "/path/to/your/deploy/script" \

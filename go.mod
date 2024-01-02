@@ -1,4 +1,4 @@
-module github.com/pyama86/git-assets-canaly-releaser
+module github.com/pyama86/git-assets-canary-releaser
 
 go 1.21.5
 
