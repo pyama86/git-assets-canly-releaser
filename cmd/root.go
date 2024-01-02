@@ -102,9 +102,9 @@ func lockAndRoll(tag, cmd string, github lib.GitHuber, state *lib.State, canaryR
 			}
 		}
 		if canaryRelease {
-			slog.Info("canary release command success", "tag", tag, "cmd", cmd)
+			slog.Info("canary release success", "tag", tag)
 		} else {
-			slog.Info("rollout command success", "tag", tag, "cmd", cmd)
+			slog.Info("rollout success", "tag", tag)
 		}
 	}
 	return nil
@@ -160,7 +160,7 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 				}
 				return handleRollback(rollbackTag, config, github)
 			} else {
-				slog.Info("health check command success", slog.String("out", out))
+				slog.Info("health check success", "tag", tag)
 				if err := state.SaveStableReleaseTag(tag); err != nil {
 					return fmt.Errorf("can't save stable tag:%s", err)
 				}
