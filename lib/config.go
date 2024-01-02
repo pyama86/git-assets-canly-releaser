@@ -3,10 +3,11 @@ package lib
 import "time"
 
 type RedisConfig struct {
-	Host     string `mapstructure:"host" validate:"required"`
-	Port     int    `mapstructure:"port" validate:"required"`
-	Password string `mapstructure:"password"`
-	DB       int    `mapstructure:"db" validate:"required"`
+	Host      string `mapstructure:"host" validate:"required"`
+	Port      int    `mapstructure:"port" validate:"required"`
+	Password  string `mapstructure:"password"`
+	DB        int    `mapstructure:"db" validate:"required"`
+	KeyPrefix string `mapstructure:"key_prefix"`
 }
 
 type Config struct {

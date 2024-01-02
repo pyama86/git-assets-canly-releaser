@@ -84,6 +84,9 @@ func lockAndRoll(tag, cmd string, github lib.GitHuber, state *lib.State, canaryR
 	} else {
 		got, err = state.TryRolloutLock(tag)
 	}
+	if err != nil {
+		return err
+	}
 
 	if got {
 		if canaryRelease {
@@ -453,6 +456,9 @@ func init() {
 
 	rootCmd.PersistentFlags().Int("redis-db", 1, "Redis DB")
 	viper.BindPFlag("redis.db", rootCmd.PersistentFlags().Lookup("redis-db"))
+
+	rootCmd.PersistentFlags().String("redis-key-prefix", "", "Redis key prefix(default repo name)")
+	viper.BindPFlag("redis.key_prefix", rootCmd.PersistentFlags().Lookup("redis-key-prefix"))
 
 	rootCmd.PersistentFlags().String("package-name-pattern", "", "Package name pattern")
 	viper.BindPFlag("package_name_pattern", rootCmd.PersistentFlags().Lookup("package-name-pattern"))

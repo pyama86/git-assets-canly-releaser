@@ -31,13 +31,17 @@ func NewState(config *Config) (*State, error) {
 	if err := rc.Ping(context.Background()).Err(); err != nil {
 		return nil, fmt.Errorf("failed to create redis client: %s", err)
 	}
+	prefix := config.Repo
+	if config.Redis.KeyPrefix != "" {
+		prefix = config.Redis.KeyPrefix
+	}
 	return &State{
 		client:              rc,
 		config:              config,
-		canaryReleaseTagKey: fmt.Sprintf("%s_canary_release_tag", config.Repo),
-		stableReleaseTagKey: fmt.Sprintf("%s_stable_release_tag", config.Repo),
-		avoidReleaseTagKey:  fmt.Sprintf("%s_avoid_release_tag", config.Repo),
-		rolloutKey:          fmt.Sprintf("%s_rollout", config.Repo),
+		canaryReleaseTagKey: fmt.Sprintf("%s_canary_release_tag", prefix),
+		stableReleaseTagKey: fmt.Sprintf("%s_stable_release_tag", prefix),
+		avoidReleaseTagKey:  fmt.Sprintf("%s_avoid_release_tag", prefix),
+		rolloutKey:          fmt.Sprintf("%s_rollout", prefix),
 	}, nil
 }
 
