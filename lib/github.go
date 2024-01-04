@@ -22,6 +22,8 @@ type GitHub struct {
 	owner                 string
 	repo                  string
 	regPackageNamePattern *regexp.Regexp
+	lastTag               string
+	lastAssetFile         string
 }
 
 type GitHuber interface {
@@ -93,6 +95,10 @@ func (g *GitHub) searchReleaseWithPreRelease(owner, repo string) (*github.Reposi
 
 func (g *GitHub) DownloadReleaseAsset(tag string) (string, string, error) {
 	var release *github.RepositoryRelease
+
+	if tag != "" && tag == g.lastTag && g.lastAssetFile != "" {
+		return tag, g.lastAssetFile, nil
+	}
 	if tag == LatestTag {
 		r, _, err := g.client.Repositories.GetLatestRelease(context.Background(), g.owner, g.repo)
 		if err != nil {
@@ -164,6 +170,9 @@ func (g *GitHub) DownloadReleaseAsset(tag string) (string, string, error) {
 			if err != nil {
 				return "", "", err
 			}
+			g.lastTag = *release.TagName
+			g.lastAssetFile = filePath
+
 			return *release.TagName, filePath, nil
 		}
 	}

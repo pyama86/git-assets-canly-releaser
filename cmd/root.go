@@ -154,8 +154,8 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 	}
 
 	if got {
-		slog.Info("lock success and start canary release", "tag", lib.LatestTag)
-		if tag, filename, err := deploy(config.DeployCommand, lib.LatestTag, state, github); err != nil {
+		slog.Info("lock success and start canary release", "tag", tag)
+		if tag, filename, err := deploy(config.DeployCommand, tag, state, github); err != nil {
 			return errors.Wrap(err, "deploy command failed")
 		} else {
 			slog.Info("deploy command success and start health check", "tag", tag, "cmd", config.HealthCheckCommand)
