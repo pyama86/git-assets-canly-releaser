@@ -52,14 +52,55 @@ var ErrAssetsNotFound = errors.New("no match assets")
 
 const LatestTag = "latest"
 
+func (g *GitHub) searchReleaseWithPreRelease(owner, repo string) (*github.RepositoryRelease, error) {
+	opts := &github.ListOptions{Page: 1, PerPage: 100}
+
+	for {
+		releases, resp, err := g.client.Repositories.ListReleases(context.Background(), owner, repo, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		// リリースがあれば最新とみなす
+		for _, release := range releases {
+			if len(release.Assets) > 0 && *release.Prerelease {
+				return release, nil
+			}
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	return nil, fmt.Errorf("no match release")
+}
+
 func (g *GitHub) DownloadReleaseAsset(tag string) (string, string, error) {
 	var release *github.RepositoryRelease
 	if tag == LatestTag {
 		r, _, err := g.client.Repositories.GetLatestRelease(context.Background(), g.owner, g.repo)
 		if err != nil {
-			return "", "", fmt.Errorf("repositories.GetRelease returned tag:%s error: %v", tag, err)
+			if !g.config.IncludePreRelease {
+				return "", "", fmt.Errorf("repositories.GetRelease returned tag:%s error: %v", tag, err)
+			}
 		}
+
 		release = r
+		if g.config.IncludePreRelease {
+			inPrerelease, err := g.searchReleaseWithPreRelease(g.owner, g.repo)
+			if err != nil {
+				return "", "", fmt.Errorf("repositories.ListReleases returned error: %v", err)
+			}
+
+			// プレリリースが最新の場合はプレリリースを返す
+			if inPrerelease != nil && (r == nil || inPrerelease.PublishedAt.After(r.PublishedAt.Time)) {
+				release = inPrerelease
+			} else {
+				release = r
+			}
+		}
 	} else {
 		r, _, err := g.client.Repositories.GetReleaseByTag(context.Background(), g.owner, g.repo, tag)
 		if err != nil {

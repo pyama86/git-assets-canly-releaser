@@ -317,7 +317,7 @@ func executeCommand(command string, tag, file string, timeout time.Duration) ([]
 		defer cancel()
 	}
 
-	cmd := exec.CommandContext(ctx, p)
+	cmd := exec.CommandContext(ctx, "sh", "-c", p)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("RELEASE_TAG=%s", tag))
 	cmd.Env = append(cmd.Env, fmt.Sprintf("ASSET_FILE=%s", file))
 
@@ -496,4 +496,7 @@ func init() {
 
 	rootCmd.PersistentFlags().Duration("healthcheck-timeout", 30*time.Second, "timeout of health check")
 	viper.BindPFlag("healthcheck_timeout", rootCmd.PersistentFlags().Lookup("healthcheck-timeout"))
+
+	rootCmd.PersistentFlags().Bool("include-prerelease", false, "include prerelease")
+	viper.BindPFlag("include_prerelease", rootCmd.PersistentFlags().Lookup("include-prerelease"))
 }

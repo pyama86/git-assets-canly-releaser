@@ -125,7 +125,7 @@ func (s *State) CanInstallTag(tag string) error {
 	}
 
 	if lastInstalledTag == "" {
-		return fmt.Errorf("last installed tag is empty")
+		return nil
 	}
 
 	if lastInstalledTag == tag {
@@ -146,7 +146,7 @@ func (s *State) CanInstallTag(tag string) error {
 }
 
 func (s *State) GetLastInstalledTag() (string, error) {
-	out, err := exec.Command(s.config.VersionCommand).Output()
+	out, err := exec.Command("sh", "-c", s.config.VersionCommand).Output()
 	if err != nil {
 		return "", err
 	}
