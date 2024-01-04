@@ -99,8 +99,6 @@ func (g *GitHub) DownloadReleaseAsset(tag string) (string, string, error) {
 			// プレリリースが最新の場合はプレリリースを返す
 			if inPrerelease != nil && (r == nil || inPrerelease.PublishedAt.After(r.PublishedAt.Time)) {
 				release = inPrerelease
-			} else {
-				release = r
 			}
 		}
 	} else {
