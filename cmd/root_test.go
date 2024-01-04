@@ -148,6 +148,7 @@ func TestHandleRollout(t *testing.T) {
 				},
 				DeployCommand:  "../testdata/dummy.sh",
 				VersionCommand: "../testdata/echo_version.sh",
+				RolloutWindow:  time.Second,
 			}
 
 			state, err := lib.NewState(config)
@@ -255,6 +256,7 @@ func TestHandleCanaryRollout(t *testing.T) {
 				HealthCheckTimeout:  time.Second,
 				HealthCheckRetries:  1,
 				CanaryRolloutWindow: time.Nanosecond,
+				RolloutWindow:       time.Second,
 			}
 
 			state, err := lib.NewState(config)

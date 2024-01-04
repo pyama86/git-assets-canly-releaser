@@ -2,8 +2,10 @@ package lib
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -12,10 +14,12 @@ import (
 )
 
 type State struct {
+	me                  string
 	client              *redis.Client
 	canaryReleaseTagKey string
 	stableReleaseTagKey string
 	avoidReleaseTagKey  string
+	membersTagKey       string
 	rolloutKey          string
 	config              *Config
 }
@@ -34,12 +38,20 @@ func NewState(config *Config) (*State, error) {
 	if config.Redis.KeyPrefix != "" {
 		prefix = config.Redis.KeyPrefix
 	}
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get hostname: %s", err)
+	}
+
 	return &State{
+		me:                  fmt.Sprintf("%s:%s", hostname, prefix),
 		client:              rc,
 		config:              config,
 		canaryReleaseTagKey: fmt.Sprintf("%s_canary_release_tag", prefix),
 		stableReleaseTagKey: fmt.Sprintf("%s_stable_release_tag", prefix),
 		avoidReleaseTagKey:  fmt.Sprintf("%s_avoid_release_tag", prefix),
+		membersTagKey:       fmt.Sprintf("%s_members_tag", prefix),
 		rolloutKey:          fmt.Sprintf("%s_rollout", prefix),
 	}, nil
 }
@@ -168,4 +180,62 @@ func (s *State) RollbackTag(beforeInstall string) (string, error) {
 		return "", fmt.Errorf("can't decided rollback tag")
 	}
 	return rollbackTag, nil
+}
+
+type MemberState struct {
+	CurrentVersion string
+}
+
+func (s *State) SaveMemberState() error {
+	pipe := s.client.Pipeline()
+
+	pipe.SAdd(context.Background(), s.membersTagKey, s.me).Err()
+	currentVersion, err := s.GetLastInstalledTag()
+	if err != nil {
+		return err
+	}
+
+	ms := &MemberState{
+		CurrentVersion: currentVersion,
+	}
+
+	b, err := json.Marshal(ms)
+	if err != nil {
+		return err
+	}
+	pipe.SetEx(context.Background(), s.me, b, s.config.RolloutWindow*2)
+	if _, err := pipe.Exec(context.Background()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *State) GetRolloutProgress(tag string) (int, int, error) {
+	members := s.client.SMembers(context.Background(), s.membersTagKey).Val()
+	all := len(members)
+	deletedMembers := make([]string, 0, all)
+	installed := 0
+	for _, m := range members {
+		b, err := s.client.Get(context.Background(), m).Bytes()
+		if err != nil {
+			if err == redis.Nil {
+				deletedMembers = append(deletedMembers, m)
+				continue
+			}
+			return 0, 0, err
+		}
+		ms := &MemberState{}
+		if err := json.Unmarshal(b, ms); err != nil {
+			return 0, 0, err
+		}
+		if ms.CurrentVersion == tag {
+			installed++
+		}
+	}
+	if len(deletedMembers) > 0 {
+		if err := s.client.SRem(context.Background(), s.membersTagKey, deletedMembers).Err(); err != nil {
+			return 0, 0, err
+		}
+	}
+	return installed, all, nil
 }

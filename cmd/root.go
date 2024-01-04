@@ -95,6 +95,10 @@ func lockAndRoll(tag, cmd string, github lib.GitHuber, state *lib.State, canaryR
 		return err
 	}
 
+	if err := state.SaveMemberState(); err != nil {
+		return err
+	}
+
 	if got {
 		if canaryRelease {
 			slog.Info("lock success and start canary release", "tag", tag, "cmd", cmd)
@@ -108,10 +112,20 @@ func lockAndRoll(tag, cmd string, github lib.GitHuber, state *lib.State, canaryR
 				return err
 			}
 		}
+
+		if err := state.SaveMemberState(); err != nil {
+			return err
+		}
+
+		installed, all, err := state.GetRolloutProgress(tag)
+		if err != nil {
+			return err
+		}
+
 		if canaryRelease {
-			slog.Info("canary release success", "tag", tag)
+			slog.Info("canary release success", "tag", tag, "progress", fmt.Sprintf("%d/%d", installed, all))
 		} else {
-			slog.Info("rollout success", "tag", tag)
+			slog.Info("rollout success", "tag", tag, "progress", fmt.Sprintf("%d/%d", installed, all))
 		}
 	}
 	return nil
