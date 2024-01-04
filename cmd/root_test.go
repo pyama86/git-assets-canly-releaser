@@ -122,12 +122,11 @@ func TestHandleRollout(t *testing.T) {
 		{
 			name: "Already installed",
 			mockSetup: func(m *MockGitHuber) {
-				m.On("DownloadReleaseAsset", "latest").Return("latest", "assetfile", nil)
+				m.On("DownloadReleaseAsset", "already_installed").Return("latest", "assetfile", nil)
 			},
 			expectedError: true,
 			before: func(redisClient *redis.Client) {
 				redisClient.Set(context.Background(), "foo/bar_stable_release_tag", "already_installed", 0)
-
 				os.Setenv("TEST_VERSION", "already_installed")
 			},
 			wantError: lib.ErrAlreadyInstalled,
@@ -155,6 +154,10 @@ func TestHandleRollout(t *testing.T) {
 			assert.NoError(t, err)
 			mockGitHub := new(MockGitHuber)
 			tc.mockSetup(mockGitHub)
+			if err := redisClient.FlushAll(context.Background()).Err(); err != nil {
+				t.Fatal(err)
+			}
+
 			tc.before(redisClient)
 
 			err = handleRollout(config, mockGitHub, state)
@@ -217,7 +220,6 @@ func TestHandleCanaryRollout(t *testing.T) {
 			},
 			expectedError: true,
 			before: func(redisClient *redis.Client) {
-				redisClient.Del(context.Background(), "foo/bar_avoid_release_tag")
 				redisClient.Set(context.Background(), "foo/bar_stable_release_tag", "stable", 0)
 				os.Setenv("TEST_VERSION", "rollback")
 			},
@@ -263,13 +265,16 @@ func TestHandleCanaryRollout(t *testing.T) {
 			assert.NoError(t, err)
 			mockGitHub := new(MockGitHuber)
 			tc.mockSetup(mockGitHub)
+			if err := redisClient.FlushAll(context.Background()).Err(); err != nil {
+				t.Fatal(err)
+			}
 			tc.before(redisClient)
 
 			err = handleCanaryRelease(config, mockGitHub, state)
 			if tc.expectedError {
 				assert.Error(t, err)
 				if tc.wantError != nil {
-					assert.Equal(t, tc.wantError, err)
+					assert.True(t, errors.Is(err, tc.wantError))
 				}
 			} else {
 				assert.NoError(t, err)

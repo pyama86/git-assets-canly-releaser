@@ -6,7 +6,6 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,6 +18,7 @@ import (
 	"github.com/avast/retry-go"
 	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/go-homedir"
+	"github.com/pkg/errors"
 	"github.com/pyama86/git-assets-canary-releaser/lib"
 	slogmulti "github.com/samber/slog-multi"
 	slogslack "github.com/samber/slog-slack/v2"
@@ -59,15 +59,17 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func deploy(cmd, tag string, state *lib.State, github lib.GitHuber) (string, string, error) {
-	tag, downloadFile, err := github.DownloadReleaseAsset(tag)
+func deploy(cmd, targetTag string, state *lib.State, github lib.GitHuber) (string, string, error) {
+	tag, downloadFile, err := github.DownloadReleaseAsset(targetTag)
 	if err != nil {
 		return "", "", fmt.Errorf("can't get release asset:%s %s", tag, err)
 	}
 
-	err = state.CanInstallTag(tag)
-	if err != nil {
-		return "", "", err
+	if targetTag == lib.LatestTag {
+		err = state.CanInstallTag(tag)
+		if err != nil {
+			return "", "", err
+		}
 	}
 
 	currentVersion, err := state.GetLastInstalledTag()
@@ -104,11 +106,17 @@ func handleRollout(config *lib.Config, github lib.GitHuber, state *lib.State) er
 		return nil
 	}
 
+	if err := state.CanInstallTag(tag); err != nil {
+		return err
+	}
 	got, err := state.TryRolloutLock(tag)
+	if err != nil {
+		return err
+	}
 	if got {
 		slog.Info("lock success and start rollout", "tag", tag)
 		if _, _, err := deploy(config.DeployCommand, tag, state, github); err != nil {
-			return fmt.Errorf("deploy command failed: %s", err)
+			return errors.Wrap(err, "deploy command failed")
 		}
 
 		installed, all, err := state.GetRolloutProgress(tag)
@@ -138,11 +146,14 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 	}
 
 	got, err := state.TryCanaryReleaseLock(lib.LatestTag)
+	if err != nil {
+		return err
+	}
 
 	if got {
 		slog.Info("lock success and start canary release", "tag", lib.LatestTag)
 		if tag, filename, err := deploy(config.DeployCommand, lib.LatestTag, state, github); err != nil {
-			return fmt.Errorf("deploy command failed: %s", err)
+			return errors.Wrap(err, "deploy command failed")
 		} else {
 			slog.Info("deploy command success and start health check", "tag", tag, "cmd", config.HealthCheckCommand)
 			if out, err := runHealthCheck(config, tag, filename); err != nil {
@@ -183,7 +194,7 @@ func handleRollback(rollbackTag string, config *lib.Config, state *lib.State, gi
 	}
 	slog.Info("start rollback", "tag", rollbackTag)
 	if _, _, err := deploy(config.RollbackCommand, rollbackTag, state, github); err != nil {
-		return fmt.Errorf("rollback error: %s", err)
+		return errors.Wrap(err, "rollback command failed")
 	}
 	slog.Info("rollback success", "tag", rollbackTag)
 	return ErrRollback
