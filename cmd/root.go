@@ -65,13 +65,6 @@ func deploy(cmd, targetTag string, state *lib.State, github lib.GitHuber) (strin
 		return "", "", fmt.Errorf("can't get release asset:%s %s", tag, err)
 	}
 
-	if targetTag == lib.LatestTag {
-		err = state.CanInstallTag(tag)
-		if err != nil {
-			return "", "", err
-		}
-	}
-
 	currentVersion, err := state.GetLastInstalledTag()
 	if err != nil {
 		return "", "", fmt.Errorf("can't get current version:%s", err)
@@ -145,7 +138,17 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 		return err
 	}
 
-	got, err := state.TryCanaryReleaseLock(lib.LatestTag)
+	tag, _, err := github.DownloadReleaseAsset(lib.LatestTag)
+	if err != nil {
+		return fmt.Errorf("can't get release asset:%s %s", tag, err)
+	}
+
+	err = state.CanInstallTag(tag)
+	if err != nil {
+		return err
+	}
+
+	got, err := state.TryCanaryReleaseLock(tag)
 	if err != nil {
 		return err
 	}
