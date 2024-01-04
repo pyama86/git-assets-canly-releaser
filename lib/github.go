@@ -74,7 +74,7 @@ func (g *GitHub) searchReleaseWithPreRelease(owner, repo string) (*github.Reposi
 		opts.Page = resp.NextPage
 	}
 
-	return nil, fmt.Errorf("no match release")
+	return nil, ErrAssetsNotFound
 }
 
 func (g *GitHub) DownloadReleaseAsset(tag string) (string, string, error) {
@@ -91,7 +91,9 @@ func (g *GitHub) DownloadReleaseAsset(tag string) (string, string, error) {
 		if g.config.IncludePreRelease {
 			inPrerelease, err := g.searchReleaseWithPreRelease(g.owner, g.repo)
 			if err != nil {
-				return "", "", fmt.Errorf("repositories.ListReleases returned error: %v", err)
+				if err != ErrAssetsNotFound {
+					return "", "", fmt.Errorf("repositories.ListReleases returned error: %v", err)
+				}
 			}
 
 			// プレリリースが最新の場合はプレリリースを返す
