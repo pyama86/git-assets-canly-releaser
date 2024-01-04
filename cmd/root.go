@@ -65,6 +65,11 @@ func deploy(cmd, tag string, state *lib.State, github lib.GitHuber) (string, str
 		return "", "", fmt.Errorf("can't get release asset:%s %s", tag, err)
 	}
 
+	err = state.CanInstallTag(tag)
+	if err != nil {
+		return "", "", err
+	}
+
 	currentVersion, err := state.GetLastInstalledTag()
 	if err != nil {
 		return "", "", fmt.Errorf("can't get current version:%s", err)
@@ -79,94 +84,65 @@ func deploy(cmd, tag string, state *lib.State, github lib.GitHuber) (string, str
 	return tag, downloadFile, nil
 }
 
-func lockAndRoll(tag, cmd string, github lib.GitHuber, state *lib.State, canaryRelease bool, afterDeploy func(string, string, error) error) error {
+func handleRollout(config *lib.Config, github lib.GitHuber, state *lib.State) error {
+	if err := state.SaveMemberState(); err != nil {
+		return err
+	}
+
 	defer func() {
 		if err := state.SaveMemberState(); err != nil {
 			slog.Error(fmt.Sprintf("failed to save state: %s", err))
 		}
 	}()
 
-	var err error
-	if canaryRelease {
-		tag, _, err = github.DownloadReleaseAsset(tag)
-		if err != nil {
-			return fmt.Errorf("can't get release asset:%s %s", tag, err)
-		}
-	}
-
-	err = state.CanInstallTag(tag)
+	tag, err := state.CurrentStableTag()
 	if err != nil {
 		return err
 	}
 
-	var got bool
-	if canaryRelease {
-		got, err = state.TryCanaryReleaseLock(tag)
-	} else {
-		got, err = state.TryRolloutLock(tag)
-	}
-	if err != nil {
-		return err
+	if tag == "" {
+		return nil
 	}
 
+	got, err := state.TryRolloutLock(tag)
 	if got {
-		if canaryRelease {
-			slog.Info("lock success and start canary release", "tag", tag, "cmd", cmd)
-		} else {
-			slog.Info("lock success and start rollout", "tag", tag, "cmd", cmd)
-		}
-
-		if tag, file, err := deploy(cmd, tag, state, github); err != nil {
+		slog.Info("lock success and start rollout", "tag", tag)
+		if _, _, err := deploy(config.DeployCommand, tag, state, github); err != nil {
 			return fmt.Errorf("deploy command failed: %s", err)
-		} else if afterDeploy != nil {
-			if err := afterDeploy(tag, file, err); err != nil {
-				return err
-			}
 		}
 
 		installed, all, err := state.GetRolloutProgress(tag)
 		if err != nil {
 			return err
 		}
-
-		if canaryRelease {
-			slog.Info("canary release success", "tag", tag, "progress", fmt.Sprintf("%d/%d", installed, all))
-		} else {
-			slog.Info("rollout success", "tag", tag, "progress", fmt.Sprintf("%d/%d", installed, all))
-		}
+		slog.Info("rollout success", "tag", tag, "progress", fmt.Sprintf("%d/%d", installed, all))
 	}
 	return nil
-}
-
-func handleRollout(config *lib.Config, github lib.GitHuber, state *lib.State) error {
-	if err := state.SaveMemberState(); err != nil {
-		return err
-	}
-
-	stableRelease, err := state.CurrentStableTag()
-	if err != nil {
-		return err
-	}
-
-	if stableRelease == "" {
-		return nil
-	}
-	return lockAndRoll(stableRelease, config.DeployCommand, github, state, false, nil)
 }
 
 func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.State) error {
 	if err := state.SaveMemberState(); err != nil {
 		return err
 	}
+
+	defer func() {
+		if err := state.SaveMemberState(); err != nil {
+			slog.Error(fmt.Sprintf("failed to save state: %s", err))
+		}
+	}()
+
 	// ロールバックのためにインストール前にインストール前のバージョンを取得しておく
 	lastInstalledTag, err := state.GetLastInstalledTag()
 	if err != nil {
 		return err
 	}
 
-	if err := lockAndRoll(lib.LatestTag, config.DeployCommand, github, state, true, func(tag, filename string, err error) error {
-		if err != nil {
-			return err
+	got, err := state.TryCanaryReleaseLock(lib.LatestTag)
+
+	if got {
+		slog.Info("lock success and start canary release", "tag", lib.LatestTag)
+		if tag, filename, err := deploy(config.DeployCommand, lib.LatestTag, state, github); err != nil {
+			return fmt.Errorf("deploy command failed: %s", err)
 		} else {
 			slog.Info("deploy command success and start health check", "tag", tag, "cmd", config.HealthCheckCommand)
 			if out, err := runHealthCheck(config, tag, filename); err != nil {
@@ -190,11 +166,10 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 				if err := state.UnlockCanaryRelease(); err != nil {
 					return fmt.Errorf("can't unlock canary release tag")
 				}
+				slog.Info("canary release success", "tag", tag)
 				return nil
 			}
 		}
-	}); err != nil {
-		return err
 	}
 	return nil
 }
@@ -276,10 +251,14 @@ func runServer(config *lib.Config) error {
 
 func runHealthCheck(config *lib.Config, tag, file string) (string, error) {
 	healthCheckTick := time.NewTicker(config.HealthCheckInterval)
-	defer healthCheckTick.Stop()
 	canaryReleaseTick := time.NewTicker(config.CanaryRolloutWindow)
-	defer canaryReleaseTick.Stop()
 
+	if viper.GetBool("once") {
+		healthCheckTick = time.NewTicker(time.Nanosecond)
+		canaryReleaseTick = time.NewTicker(time.Nanosecond)
+	}
+	defer healthCheckTick.Stop()
+	defer canaryReleaseTick.Stop()
 	f := func() (string, error) {
 		ret := ""
 		cxt, cancel := context.WithTimeout(
@@ -320,11 +299,6 @@ func runHealthCheck(config *lib.Config, tag, file string) (string, error) {
 }
 
 func executeCommand(command string, tag, file string, timeout time.Duration) ([]byte, error) {
-	p, err := filepath.Abs(command)
-	if err != nil {
-		return nil, err
-	}
-
 	ctx := context.Background()
 	if timeout > 0 {
 		var cancel context.CancelFunc
@@ -332,7 +306,7 @@ func executeCommand(command string, tag, file string, timeout time.Duration) ([]
 		defer cancel()
 	}
 
-	cmd := exec.CommandContext(ctx, "sh", "-c", p)
+	cmd := exec.CommandContext(ctx, "sh", "-c", command)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("RELEASE_TAG=%s", tag))
 	cmd.Env = append(cmd.Env, fmt.Sprintf("ASSET_FILE=%s", file))
 
