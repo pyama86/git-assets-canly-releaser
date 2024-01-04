@@ -75,14 +75,13 @@ func (g *GitHub) searchReleaseWithPreRelease(owner, repo string) (*github.Reposi
 	// sort by published date desc
 	for i := 0; i < len(allReleases); i++ {
 		for j := i + 1; j < len(allReleases); j++ {
-			if allReleases[i].PublishedAt.After(allReleases[j].PublishedAt.Time) {
+			if allReleases[i].PublishedAt.Before(allReleases[j].PublishedAt.Time) {
 				allReleases[i], allReleases[j] = allReleases[j], allReleases[i]
 			}
 		}
 	}
 
 	for _, r := range allReleases {
-		// skip draft
 		if r.GetDraft() {
 			continue
 		}
