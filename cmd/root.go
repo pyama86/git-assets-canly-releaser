@@ -243,7 +243,7 @@ func runServer(config *lib.Config) error {
 					slog.Debug("can't rollout", "err", err)
 				} else {
 					if errors.Is(err, ErrRollback) {
-						slog.Info("rollback success")
+						slog.Warn("rollback success")
 					} else if errors.Is(err, ErrNoRollback) {
 						slog.Info("no rollback because no rollback command")
 					} else {
