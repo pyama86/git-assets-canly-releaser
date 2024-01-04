@@ -161,6 +161,7 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 		return nil
 	}
 
+	// インストール前に状態を保存しておく
 	lastInstalledTag, err := state.GetLastInstalledTag()
 	if err != nil {
 		return err
