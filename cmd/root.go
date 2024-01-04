@@ -80,7 +80,21 @@ func deploy(cmd, tag string, state *lib.State, github lib.GitHuber) (string, str
 }
 
 func lockAndRoll(tag, cmd string, github lib.GitHuber, state *lib.State, canaryRelease bool, afterDeploy func(string, string, error) error) error {
-	err := state.CanInstallTag(tag)
+	defer func() {
+		if err := state.SaveMemberState(); err != nil {
+			slog.Error(fmt.Sprintf("failed to save state: %s", err))
+		}
+	}()
+
+	var err error
+	if canaryRelease {
+		tag, _, err = github.DownloadReleaseAsset(tag)
+		if err != nil {
+			return fmt.Errorf("can't get release asset:%s %s", tag, err)
+		}
+	}
+
+	err = state.CanInstallTag(tag)
 	if err != nil {
 		return err
 	}
@@ -101,16 +115,13 @@ func lockAndRoll(tag, cmd string, github lib.GitHuber, state *lib.State, canaryR
 		} else {
 			slog.Info("lock success and start rollout", "tag", tag, "cmd", cmd)
 		}
+
 		if tag, file, err := deploy(cmd, tag, state, github); err != nil {
 			return fmt.Errorf("deploy command failed: %s", err)
 		} else if afterDeploy != nil {
 			if err := afterDeploy(tag, file, err); err != nil {
 				return err
 			}
-		}
-
-		if err := state.SaveMemberState(); err != nil {
-			return err
 		}
 
 		installed, all, err := state.GetRolloutProgress(tag)
@@ -147,27 +158,13 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 	if err := state.SaveMemberState(); err != nil {
 		return err
 	}
-	latestTag, _, err := github.DownloadReleaseAsset(lib.LatestTag)
-	if err != nil {
-		return err
-	}
-
-	stableRelease, err := state.CurrentStableTag()
-	if err != nil {
-		return err
-	}
-
-	if latestTag == stableRelease {
-		return nil
-	}
-
-	// インストール前に状態を保存しておく
+	// ロールバックのためにインストール前にインストール前のバージョンを取得しておく
 	lastInstalledTag, err := state.GetLastInstalledTag()
 	if err != nil {
 		return err
 	}
 
-	if err := lockAndRoll(latestTag, config.DeployCommand, github, state, true, func(tag, filename string, err error) error {
+	if err := lockAndRoll(lib.LatestTag, config.DeployCommand, github, state, true, func(tag, filename string, err error) error {
 		if err != nil {
 			return err
 		} else {
