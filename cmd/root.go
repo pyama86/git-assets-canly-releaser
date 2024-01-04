@@ -84,12 +84,6 @@ func handleRollout(config *lib.Config, github lib.GitHuber, state *lib.State) er
 		return err
 	}
 
-	defer func() {
-		if err := state.SaveMemberState(); err != nil {
-			slog.Error(fmt.Sprintf("failed to save state: %s", err))
-		}
-	}()
-
 	tag, err := state.CurrentStableTag()
 	if err != nil {
 		return err
@@ -112,6 +106,10 @@ func handleRollout(config *lib.Config, github lib.GitHuber, state *lib.State) er
 			return errors.Wrap(err, "deploy command failed")
 		}
 
+		if err := state.SaveMemberState(); err != nil {
+			slog.Error(fmt.Sprintf("failed to save state: %s", err))
+		}
+
 		installed, all, err := state.GetRolloutProgress(tag)
 		if err != nil {
 			return err
@@ -125,12 +123,6 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 	if err := state.SaveMemberState(); err != nil {
 		return err
 	}
-
-	defer func() {
-		if err := state.SaveMemberState(); err != nil {
-			slog.Error(fmt.Sprintf("failed to save state: %s", err))
-		}
-	}()
 
 	// ロールバックのためにインストール前にインストール前のバージョンを取得しておく
 	lastInstalledTag, err := state.GetLastInstalledTag()
@@ -175,6 +167,10 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 				slog.Info("health check success", "tag", tag)
 				if err := state.SaveStableReleaseTag(tag); err != nil {
 					return fmt.Errorf("can't save stable tag:%s", err)
+				}
+
+				if err := state.SaveMemberState(); err != nil {
+					slog.Error(fmt.Sprintf("failed to save state: %s", err))
 				}
 
 				if err := state.UnlockCanaryRelease(); err != nil {
