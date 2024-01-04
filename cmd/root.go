@@ -130,9 +130,18 @@ func handleCanaryRelease(config *lib.Config, github lib.GitHuber, state *lib.Sta
 		return err
 	}
 
+	stableTab, err := state.CurrentStableTag()
+	if err != nil {
+		return err
+	}
+
 	tag, _, err := github.DownloadReleaseAsset(lib.LatestTag)
 	if err != nil {
 		return fmt.Errorf("can't get release asset:%s %s", tag, err)
+	}
+
+	if tag == stableTab {
+		return nil
 	}
 
 	err = state.CanInstallTag(tag)
