@@ -25,4 +25,18 @@ run_example:
 	docker compose rm -f
 	docker compose up --build
 
+run:
+	mkdir -p tmp
+	rm -rf tmp/*
+	go run main.go --repo pyama86/release-test \
+	--deploy-command echo \
+	--rollback-command echo \
+	--healthcheck-command echo \
+	--version-command echo \
+	--package-name-pattern ".*" \
+	--log-level debug \
+	--once \
+	--save-assets-path ./tmp \
+	--include-prerelease
+
 .PHONY: test devdeps lint release

@@ -30,4 +30,5 @@ type Config struct {
 	LogLevel                 string        `mapstructure:"log_level"`
 	HealthCheckRetries       uint          `mapstructure:"healthcheck_retries" validate:"required"`
 	HealthCheckTimeout       time.Duration `mapstructure:"healthcheck_timeout" validate:"required"`
+	IncludePreRelease        bool          `mapstructure:"include_prerelease"`
 }
