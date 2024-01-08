@@ -9,7 +9,7 @@ require (
 	github.com/k1LoW/go-github-client/v55 v55.0.11
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/pkg/errors v0.9.1
-	github.com/redis/go-redis/v9 v9.3.1
+	github.com/redis/go-redis/v9 v9.4.0
 	github.com/samber/slog-multi v1.0.2
 	github.com/samber/slog-slack/v2 v2.3.0
 	github.com/spf13/cobra v1.8.0
