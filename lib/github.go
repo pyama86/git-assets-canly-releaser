@@ -2,7 +2,6 @@ package lib
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/google/go-github/v55/github"
 	"github.com/k1LoW/go-github-client/v55/factory"
@@ -92,6 +93,8 @@ func (g *GitHub) searchReleaseWithPreRelease(owner, repo string) (*github.Reposi
 	return nil, ErrAssetsNotFound
 }
 
+var ErrAssetsCannotDownload = errors.New("assets cannot download")
+
 func (g *GitHub) DownloadReleaseAsset(tag string) (string, string, error) {
 	var release *github.RepositoryRelease
 
@@ -102,7 +105,7 @@ func (g *GitHub) DownloadReleaseAsset(tag string) (string, string, error) {
 		r, _, err := g.client.Repositories.GetLatestRelease(context.Background(), g.owner, g.repo)
 		if err != nil {
 			if !g.config.IncludePreRelease {
-				return "", "", fmt.Errorf("repositories.GetRelease returned tag:%s error: %v", tag, err)
+				return "", "", errors.Wrap(ErrAssetsCannotDownload, fmt.Sprintf("repositories.GetRelease returned tag:%s error: %v", tag, err))
 			}
 		}
 
@@ -123,7 +126,7 @@ func (g *GitHub) DownloadReleaseAsset(tag string) (string, string, error) {
 	} else {
 		r, _, err := g.client.Repositories.GetReleaseByTag(context.Background(), g.owner, g.repo, tag)
 		if err != nil {
-			return "", "", fmt.Errorf("repositories.GetRelease returned tag:%s error: %v", tag, err)
+			return "", "", errors.Wrap(ErrAssetsCannotDownload, fmt.Sprintf("repositories.GetRelease returned tag:%s error: %v", tag, err))
 		}
 		release = r
 	}
