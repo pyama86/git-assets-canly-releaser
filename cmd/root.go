@@ -237,6 +237,8 @@ func runServer(config *lib.Config) error {
 			if err := handleRollout(config, github, state); err != nil {
 				if errors.Is(err, lib.ErrAlreadyInstalled) {
 					slog.Debug("can't rollout", "err", err)
+				} else if errors.Is(err, lib.ErrAssetsCannotDownload) {
+					slog.Warn("can't get assets files")
 				} else {
 					return err
 				}
@@ -250,6 +252,8 @@ func runServer(config *lib.Config) error {
 					errors.Is(err, lib.ErrAlreadyInstalled) ||
 					errors.Is(err, lib.ErrAvoidReleaseTag) {
 					slog.Debug("can't rollout", "err", err)
+				} else if errors.Is(err, lib.ErrAssetsCannotDownload) {
+					slog.Warn("can't get assets files")
 				} else {
 					if errors.Is(err, ErrRollback) {
 						slog.Warn("rollback success")
