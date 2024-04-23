@@ -11,7 +11,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.5.1
 	github.com/samber/slog-multi v1.0.2
-	github.com/samber/slog-slack/v2 v2.4.1
+	github.com/samber/slog-slack/v2 v2.4.2
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.9.0
@@ -45,7 +45,7 @@ require (
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/samber/lo v1.38.1 // indirect
-	github.com/samber/slog-common v0.15.1 // indirect
+	github.com/samber/slog-common v0.15.2 // indirect
 	github.com/slack-go/slack v0.12.1 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
