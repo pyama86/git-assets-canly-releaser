@@ -11,7 +11,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.5.1
 	github.com/samber/slog-multi v1.0.2
-	github.com/samber/slog-slack/v2 v2.4.2
+	github.com/samber/slog-slack/v2 v2.5.0
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.9.0
