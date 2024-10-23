@@ -1,7 +1,7 @@
 module github.com/pyama86/git-assets-canary-releaser
 
-go 1.23.2
 
+go 1.23.2
 require (
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/go-playground/validator/v10 v10.22.1
@@ -16,7 +16,7 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.9.0
 	github.com/tj/assert v0.0.3
-	go.uber.org/mock v0.4.0
+	go.uber.org/mock v0.5.0
 )
 
 require (
