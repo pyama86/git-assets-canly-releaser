@@ -14,7 +14,7 @@ require (
 	github.com/samber/slog-slack/v2 v2.7.1
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/tj/assert v0.0.3
 	go.uber.org/mock v0.5.0
 )
